@@ -1,8 +1,11 @@
 package manager
 
+import (
+	"github.com/firesquid6/sysdef/config"
+)
 
-func InstallPackages() {
 
+func InstallPackages(c config.ManagerConfig) {
 }
 
 func UninstallPackages() {
