@@ -1,16 +1,24 @@
 
+// used to store and fill in variables
 export class VariableStore {
   private map: Map<string, string> = new Map();
 
   // gets a variable and throws an error if it doesn't exist
-  get(k: string) {
+  get(k: string): string {
     const v = this.map.get(k);
     if (!v) {
       throw new Error(`Error getting variable: "${k}". It wasn't set anywhere.`);
     }
+    return v;
   }
   set(k: string, v: string): void {
     this.map.set(k, v);
+  }
+  has(k: string): boolean {
+    return this.map.has(k);
+  }
+  getSafe(k: string): string | undefined {
+    return this.map.get(k);
   }
   fillIn(s: string) {
     let substr = "";
@@ -55,6 +63,7 @@ export interface PackageInfo {
   version: string;
   provider: string;
 }
+
 
 export interface Provider {
   getName: () => string;
