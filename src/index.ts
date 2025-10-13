@@ -14,22 +14,24 @@ export class VariableStore {
   }
   fillIn(s: string) {
     let substr = "";
-    let substrStart = 0;
     let insideBracket = false;
     let newString = "";
 
     for (let i = 0; i < s.length; i++) {
       if (s[i] === "{") {
-        newString += `{substr}`;
-        substr = ""
-        substrStart = i;
+        if (insideBracket) {
+          newString += "{" + substr;
+        }
+        substr = "";
         insideBracket = true;
       } else if (s[i] === "}") {
         const v = this.map.get(substr);
         if (insideBracket && v !== undefined) {
           newString += v;
+        } else if (insideBracket) {
+          newString += "{" + substr + "}";
         } else {
-          newString += `{substr}`;
+          newString += "}";
         }
         insideBracket = false;
         substr = "";
@@ -39,6 +41,12 @@ export class VariableStore {
         newString += s[i];
       }
     }
+    
+    if (insideBracket) {
+      newString += "{" + substr;
+    }
+    
+    return newString;
   }
 }
 
