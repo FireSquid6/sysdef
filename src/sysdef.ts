@@ -64,15 +64,73 @@ export interface PackageInfo {
   provider: string;
 }
 
+export interface ShellResult {
+  code: number;
+  text: string;
+}
+
+export type Shell = (s: string, noThrow?: boolean) => Promise<ShellResult>
+
+export const defaultShell: Shell = async (s, noThrow) => {
+  if (noThrow === undefined) {
+    noThrow = false;
+  }
+
+  const p = Bun.spawn({
+    cmd: s.split(" "),
+    stdout: "pipe",
+    stderr: "inherit",
+    stdin: "ignore",
+  });
+  
+
+  let output = "";
+  for await (const chunk of p.stdout) {
+    process.stdout.write(chunk);
+    output += chunk;
+  }
+
+  const code = await p.exited;
+  
+  if (code !== 0 && !noThrow) {
+    throw new Error(`Process called with ${s} returned exit code ${code}`);
+  }
+
+  return {
+    code,
+    text: output,
+  }
+}
+
+export const dryShell: Shell = async (s) => {
+  console.log(`Would run: $ ${s}`);
+
+  return {
+    code: 0,
+    text: "",
+  }
+}
 
 export interface Provider {
-  getName: () => string;
-  install: (packages: string[]) => Promise<void>;
+  readonly name: string;
+  // we have to do it with a specific version and name
+  install: (packages: PackageInfo[]) => Promise<void>;
   uninstall: (packages: string[]) => Promise<void>;
   getInstalled: () => Promise<PackageInfo[]>;
   update: (packages: string[]) => Promise<void>;
 }
 
-export type ProviderModule = (v: VariableStore) => Provider
+
+export interface Module {
+  name: string;
+  variables: Record<string, string>;
+  packages: Record<string, string[]>;
+  onEnable?: (s: Shell) => Promise<void>;
+  onDisable?: (s: Shell) => Promise<void>;
+  everySync?: (s: Shell) => Promise<void>;
+}
+
+export type ProviderGenerator = (s: Shell, v: VariableStore) => Provider;
+export type ModuleGenerator = (s: Shell, v: VariableStore) => Module;
 
 
