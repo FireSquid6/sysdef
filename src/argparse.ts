@@ -12,12 +12,12 @@ export function filterArgs(args: string[]): string[] {
       return args.slice(i + 1);
     }
   }
-  
+
   // Second pass: look for subcommands (non-path, non-flag arguments after first arg)
   for (let i = 1; i < args.length; i++) {
     const arg = args[i]!;
     const prevArg = args[i - 1]!;
-    
+
     if (!prevArg.includes("/") && !arg.startsWith("-") && !arg.includes("/")) {
       return args.slice(i);
     }
@@ -62,17 +62,20 @@ export function parseArgs(args: string[]): ParsedArgs {
 export type FlagConfig<T extends string> = {
   name: T;
   alternatives: string[];
+  description?: string;
 }
 
 export type OptionConfig<T extends string> = {
   name: T;
   required: boolean;
-  alternatives: string[]
+  alternatives: string[];
+  description?: string;
 }
 
 export type PositionalConfig<T extends string> = {
   name: T;
   required: boolean;
+  description?: string;
 }
 
 export type ExtractName<T> = T extends { name: infer N } ? N : never;
@@ -101,6 +104,7 @@ export type Command<
   options: Options;
   positional: Positional;
   subcommands: Subcommands;
+  description?: string;
   action: (
     options: ParsedOptions<Options>,
     flags: ParsedFlags<Flags>,
@@ -127,15 +131,136 @@ export function command<T extends Command<any, any, any, any>>(command: T): T {
 }
 
 export function errorOut(message: string): never {
-  throw new Error(`Error: ${message}`); 
+  throw new Error(`Error: ${message}`);
 }
 
-export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T): Promise<void> {
+export function generateHelp<T extends CommandMap>(
+  commandMap: T,
+  commandName: string = "_default",
+  programName: string = "program"
+): string {
+  const command = commandMap[commandName];
+  if (!command) {
+    return `Command '${commandName}' not found`;
+  }
+
+  let help = `Usage: ${programName}`;
+
+  if (commandName !== "_default") {
+    help += ` ${commandName}`;
+  }
+
+  // Add flags to usage
+  if (command.flags.length > 0) {
+    help += " [FLAGS]";
+  }
+
+  // Add options to usage
+  if (command.options.length > 0) {
+    help += " [OPTIONS]";
+  }
+
+  // Add positional arguments to usage
+  for (const pos of command.positional) {
+    if (pos.required) {
+      help += ` <${pos.name}>`;
+    } else {
+      help += ` [${pos.name}]`;
+    }
+  }
+
+  // Add subcommands to usage
+  if (command.subcommands && Object.keys(command.subcommands).length > 0) {
+    help += " [SUBCOMMAND]";
+  }
+
+  help += "\n";
+
+  // Add command description
+  if (command.description) {
+    help += `\n${command.description}\n`;
+  }
+
+  // Add positional arguments section
+  if (command.positional.length > 0) {
+    help += "\nARGUMENTS:\n";
+    for (const pos of command.positional) {
+      help += `    ${pos.name}`;
+      if (pos.description) {
+        help += `    ${pos.description}`;
+      }
+      if (pos.required) {
+        help += " (required)";
+      }
+      help += "\n";
+    }
+  }
+
+  // Add options section
+  if (command.options.length > 0) {
+    help += "\nOPTIONS:\n";
+    for (const option of command.options) {
+      const names = [option.name, ...option.alternatives];
+      const namesList = names.map(name => name.length === 1 ? `-${name}` : `--${name}`).join(", ");
+      help += `    ${namesList} <value>`;
+      if (option.description) {
+        help += `    ${option.description}`;
+      }
+      if (option.required) {
+        help += " (required)";
+      }
+      help += "\n";
+    }
+  }
+
+  // Add flags section
+  if (command.flags.length > 0) {
+    help += "\nFLAGS:\n";
+    for (const flag of command.flags) {
+      const names = [flag.name, ...flag.alternatives];
+      const namesList = names.map(name => name.length === 1 ? `-${name}` : `--${name}`).join(", ");
+      help += `    ${namesList}`;
+      if (flag.description) {
+        help += `    ${flag.description}`;
+      }
+      help += "\n";
+    }
+  }
+
+  // Add subcommands section
+  if (command.subcommands && Object.keys(command.subcommands).length > 0) {
+    help += "\nSUBCOMMANDS:\n";
+    for (const [subName, subCommand] of Object.entries(command.subcommands)) {
+      help += `    ${subName}`;
+      //@ts-expect-error it's fine
+      if (subCommand.description) {
+        //@ts-expect-error it's fine
+        help += `    ${subCommand.description}`;
+      }
+      help += "\n";
+    }
+    help += `\nUse '${programName} ${commandName !== "_default" ? commandName + " " : ""}[SUBCOMMAND] --help' for more information on a subcommand.\n`;
+  }
+
+  return help;
+}
+
+export async function executeArgs<T extends CommandMap>(
+  args: ParsedArgs,
+  map: T,
+  programName: string = "program"
+): Promise<void> {
   const commandName = args.positional.length === 0 ? "_default" : args.positional.shift()!;
   const command = map[commandName];
 
   if (command === undefined) {
     errorOut(`Command ${commandName} not found`);
+  }
+
+  // Check for help flag before processing anything else
+  if (args.flags.help || args.flags.h) {
+    console.log(generateHelp(map, commandName, programName));
+    return;
   }
 
   // check for a subcommand
@@ -145,19 +270,19 @@ export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T
   // we don't get static typing here to avoid circular definitions
   // subcommands is typed to any
   if (subcommandExists) {
-    executeArgs(args, command.subcommands);
+    executeArgs(args, command.subcommands, programName);
     return;
   }
 
   // Validate flags
   const validatedFlags: Record<string, boolean> = {};
   const usedFlagNames = new Set<string>();
-  
+
   for (const flagConfig of command.flags) {
     const allFlagNames = [flagConfig.name, ...flagConfig.alternatives];
     let foundFlag = false;
     let foundName = '';
-    
+
     for (const flagName of allFlagNames) {
       if (args.flags[flagName]) {
         if (foundFlag) {
@@ -165,17 +290,17 @@ export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T
         }
         foundFlag = true;
         foundName = flagName;
-        
+
         if (usedFlagNames.has(flagName)) {
           errorOut(`Flag '${flagName}' specified multiple times`);
         }
         usedFlagNames.add(flagName);
       }
     }
-    
+
     validatedFlags[flagConfig.name] = foundFlag;
   }
-  
+
   // Check for unknown flags
   for (const flagName in args.flags) {
     if (!usedFlagNames.has(flagName)) {
@@ -186,13 +311,13 @@ export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T
   // Validate options
   const validatedOptions: Record<string, string | undefined> = {};
   const usedOptionNames = new Set<string>();
-  
+
   for (const optionConfig of command.options) {
     const allOptionNames = [optionConfig.name, ...optionConfig.alternatives];
     let foundOption = false;
     let foundValue = '';
     let foundName = '';
-    
+
     for (const optionName of allOptionNames) {
       if (args.options[optionName] !== undefined) {
         if (foundOption) {
@@ -201,21 +326,21 @@ export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T
         foundOption = true;
         foundValue = args.options[optionName]!;
         foundName = optionName;
-        
+
         if (usedOptionNames.has(optionName)) {
           errorOut(`Option '${optionName}' specified multiple times`);
         }
         usedOptionNames.add(optionName);
       }
     }
-    
+
     if (optionConfig.required && !foundOption) {
       errorOut(`Required option '${optionConfig.name}' is missing`);
     }
-    
+
     validatedOptions[optionConfig.name] = foundOption ? foundValue : undefined;
   }
-  
+
   // Check for unknown options
   for (const optionName in args.options) {
     if (!usedOptionNames.has(optionName)) {
@@ -225,18 +350,18 @@ export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T
 
   // Validate positional arguments
   const validatedPositional: Record<string, string | undefined> = {};
-  
+
   for (let i = 0; i < command.positional.length; i++) {
     const positionalConfig = command.positional[i]!;
     const value = args.positional[i];
-    
+
     if (positionalConfig.required && value === undefined) {
       errorOut(`Required positional argument '${positionalConfig.name}' is missing`);
     }
-    
+
     validatedPositional[positionalConfig.name] = value;
   }
-  
+
   // Check for extra positional arguments
   if (args.positional.length > command.positional.length) {
     const extraArgs = args.positional.slice(command.positional.length);
