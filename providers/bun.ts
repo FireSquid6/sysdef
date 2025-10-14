@@ -20,6 +20,9 @@ const mod: ProviderGenerator = (run: Shell) => {
     async update(packages) {
         
     },
+    async initialize() {
+        
+    },
   }
 }
 

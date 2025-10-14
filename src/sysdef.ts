@@ -56,6 +56,24 @@ export class VariableStore {
     
     return newString;
   }
+
+  insertAll(r: Record<string, string>) {
+    for (const [k, v] of Object.entries(r)) {
+      this.map.set(k, v);
+    }
+  }
+
+  // creates a new variable store including all of the ones already present
+  // plus some ones from a new record
+  branchOff(r: Record<string, string>): VariableStore {
+    const store = new VariableStore();
+    for (const k of this.map.keys()) {
+      store.set(k, this.map.get(k)!);
+    }
+
+    store.insertAll(r);
+    return store;
+  }
 }
 
 export interface PackageInfo {
@@ -118,19 +136,50 @@ export interface Provider {
   uninstall: (packages: string[]) => Promise<void>;
   getInstalled: () => Promise<PackageInfo[]>;
   update: (packages: string[]) => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
 
+// when just a string, the file treats it as a filepath in the `dotfiles` directory. Otherwise,
+// the function that generates a string is treated as something that will return what should be 
+// the contents of the file. You can use the variable store in this case. 
+//
+// It's a difference between a symlink and a generated file.
+export type File = string | (() => string);
+
+
 export interface Module {
-  name: string;
-  variables: Record<string, string>;
-  packages: Record<string, string[]>;
-  onEnable?: (s: Shell) => Promise<void>;
-  onDisable?: (s: Shell) => Promise<void>;
-  everySync?: (s: Shell) => Promise<void>;
+  readonly name: string;
+  readonly variables: Record<string, string>;
+
+  readonly packages: Record<string, string[]>;
+  readonly directories: Record<string, string>;  
+  readonly files: Record<string, File>;
+  
+  // factory files are made and include all of the variables
+  readonly factoryFiles: Record<string, string>;
+
+  readonly onEnable?: (s: Shell) => Promise<void>;
+  readonly onDisable?: (s: Shell) => Promise<void>;
+  readonly onEverySync?: (s: Shell) => Promise<void>;
 }
 
 export type ProviderGenerator = (s: Shell, v: VariableStore) => Provider;
 export type ModuleGenerator = (s: Shell, v: VariableStore) => Module;
+
+
+
+export async function syncPackages(modules: Module[], providers: Provider[]) {
+  // sync all dotfiles
+
+}
+
+export async function syncFiles(modules: Module[]) {
+
+}
+
+export async function runEvents(modules: Module[]) {
+
+}
 
 
