@@ -150,17 +150,14 @@ export function generateHelp<T extends CommandMap>(
     help += ` ${commandName}`;
   }
 
-  // Add flags to usage
   if (command.flags.length > 0) {
     help += " [FLAGS]";
   }
 
-  // Add options to usage
   if (command.options.length > 0) {
     help += " [OPTIONS]";
   }
 
-  // Add positional arguments to usage
   for (const pos of command.positional) {
     if (pos.required) {
       help += ` <${pos.name}>`;
@@ -169,19 +166,17 @@ export function generateHelp<T extends CommandMap>(
     }
   }
 
-  // Add subcommands to usage
   if (command.subcommands && Object.keys(command.subcommands).length > 0) {
     help += " [SUBCOMMAND]";
   }
 
   help += "\n";
 
-  // Add command description
   if (command.description) {
     help += `\n${command.description}\n`;
   }
 
-  // Add positional arguments section
+  // Positional
   if (command.positional.length > 0) {
     help += "\nARGUMENTS:\n";
     for (const pos of command.positional) {
@@ -196,7 +191,7 @@ export function generateHelp<T extends CommandMap>(
     }
   }
 
-  // Add options section
+  // Options
   if (command.options.length > 0) {
     help += "\nOPTIONS:\n";
     for (const option of command.options) {
@@ -213,7 +208,7 @@ export function generateHelp<T extends CommandMap>(
     }
   }
 
-  // Add flags section
+  // Flags
   if (command.flags.length > 0) {
     help += "\nFLAGS:\n";
     for (const flag of command.flags) {
@@ -227,12 +222,11 @@ export function generateHelp<T extends CommandMap>(
     }
   }
 
-  // Add subcommands section
   if (command.subcommands && Object.keys(command.subcommands).length > 0) {
     help += "\nSUBCOMMANDS:\n";
     for (const [subName, subCommand] of Object.entries(command.subcommands)) {
       help += `    ${subName}`;
-      //@ts-expect-error it's fine
+      //@ts-expect-error it's fine. Subcommands is typed to any because typescript is annoying
       if (subCommand.description) {
         //@ts-expect-error it's fine
         help += `    ${subCommand.description}`;
@@ -259,6 +253,7 @@ export async function executeArgs<T extends CommandMap>(
 
   // Check for help flag before processing anything else
   if (args.flags.help || args.flags.h) {
+    // we just wanna do help in this case
     console.log(generateHelp(map, commandName, programName));
     return;
   }
@@ -274,7 +269,6 @@ export async function executeArgs<T extends CommandMap>(
     return;
   }
 
-  // Validate flags
   const validatedFlags: Record<string, boolean> = {};
   const usedFlagNames = new Set<string>();
 
@@ -301,14 +295,12 @@ export async function executeArgs<T extends CommandMap>(
     validatedFlags[flagConfig.name] = foundFlag;
   }
 
-  // Check for unknown flags
   for (const flagName in args.flags) {
     if (!usedFlagNames.has(flagName)) {
       errorOut(`Unknown flag: '${flagName}'`);
     }
   }
 
-  // Validate options
   const validatedOptions: Record<string, string | undefined> = {};
   const usedOptionNames = new Set<string>();
 
@@ -341,14 +333,12 @@ export async function executeArgs<T extends CommandMap>(
     validatedOptions[optionConfig.name] = foundOption ? foundValue : undefined;
   }
 
-  // Check for unknown options
   for (const optionName in args.options) {
     if (!usedOptionNames.has(optionName)) {
       errorOut(`Unknown option: '${optionName}'`);
     }
   }
 
-  // Validate positional arguments
   const validatedPositional: Record<string, string | undefined> = {};
 
   for (let i = 0; i < command.positional.length; i++) {
@@ -362,13 +352,11 @@ export async function executeArgs<T extends CommandMap>(
     validatedPositional[positionalConfig.name] = value;
   }
 
-  // Check for extra positional arguments
   if (args.positional.length > command.positional.length) {
     const extraArgs = args.positional.slice(command.positional.length);
     errorOut(`Unexpected positional arguments: ${extraArgs.join(', ')}`);
   }
 
-  // Execute the command action
   await command.action(
     validatedOptions as ParsedOptions<typeof command.options>,
     validatedFlags as ParsedFlags<typeof command.flags>,
