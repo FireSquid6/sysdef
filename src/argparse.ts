@@ -61,13 +61,13 @@ export function parseArgs(args: string[]): ParsedArgs {
 
 export type FlagConfig<T extends string> = {
   name: T;
-  args: string[]
+  alternatives: string[];
 }
 
 export type OptionConfig<T extends string> = {
   name: T;
   required: boolean;
-  args: string[]
+  alternatives: string[]
 }
 
 export type PositionalConfig<T extends string> = {
@@ -127,8 +127,7 @@ export function command<T extends Command<any, any, any, any>>(command: T): T {
 }
 
 export function errorOut(message: string): never {
-  console.error(`Error: ${message}`); 
-  process.exit(1);
+  throw new Error(`Error: ${message}`); 
 }
 
 export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T): Promise<void> {
@@ -150,7 +149,104 @@ export async function executeArgs<T extends CommandMap>(args: ParsedArgs, map: T
     return;
   }
 
-  for (const f of command.flags) {
-
+  // Validate flags
+  const validatedFlags: Record<string, boolean> = {};
+  const usedFlagNames = new Set<string>();
+  
+  for (const flagConfig of command.flags) {
+    const allFlagNames = [flagConfig.name, ...flagConfig.alternatives];
+    let foundFlag = false;
+    let foundName = '';
+    
+    for (const flagName of allFlagNames) {
+      if (args.flags[flagName]) {
+        if (foundFlag) {
+          errorOut(`Flag '${flagConfig.name}' specified multiple times using different names: '${foundName}' and '${flagName}'`);
+        }
+        foundFlag = true;
+        foundName = flagName;
+        
+        if (usedFlagNames.has(flagName)) {
+          errorOut(`Flag '${flagName}' specified multiple times`);
+        }
+        usedFlagNames.add(flagName);
+      }
+    }
+    
+    validatedFlags[flagConfig.name] = foundFlag;
   }
+  
+  // Check for unknown flags
+  for (const flagName in args.flags) {
+    if (!usedFlagNames.has(flagName)) {
+      errorOut(`Unknown flag: '${flagName}'`);
+    }
+  }
+
+  // Validate options
+  const validatedOptions: Record<string, string | undefined> = {};
+  const usedOptionNames = new Set<string>();
+  
+  for (const optionConfig of command.options) {
+    const allOptionNames = [optionConfig.name, ...optionConfig.alternatives];
+    let foundOption = false;
+    let foundValue = '';
+    let foundName = '';
+    
+    for (const optionName of allOptionNames) {
+      if (args.options[optionName] !== undefined) {
+        if (foundOption) {
+          errorOut(`Option '${optionConfig.name}' specified multiple times using different names: '${foundName}' and '${optionName}'`);
+        }
+        foundOption = true;
+        foundValue = args.options[optionName]!;
+        foundName = optionName;
+        
+        if (usedOptionNames.has(optionName)) {
+          errorOut(`Option '${optionName}' specified multiple times`);
+        }
+        usedOptionNames.add(optionName);
+      }
+    }
+    
+    if (optionConfig.required && !foundOption) {
+      errorOut(`Required option '${optionConfig.name}' is missing`);
+    }
+    
+    validatedOptions[optionConfig.name] = foundOption ? foundValue : undefined;
+  }
+  
+  // Check for unknown options
+  for (const optionName in args.options) {
+    if (!usedOptionNames.has(optionName)) {
+      errorOut(`Unknown option: '${optionName}'`);
+    }
+  }
+
+  // Validate positional arguments
+  const validatedPositional: Record<string, string | undefined> = {};
+  
+  for (let i = 0; i < command.positional.length; i++) {
+    const positionalConfig = command.positional[i]!;
+    const value = args.positional[i];
+    
+    if (positionalConfig.required && value === undefined) {
+      errorOut(`Required positional argument '${positionalConfig.name}' is missing`);
+    }
+    
+    validatedPositional[positionalConfig.name] = value;
+  }
+  
+  // Check for extra positional arguments
+  if (args.positional.length > command.positional.length) {
+    const extraArgs = args.positional.slice(command.positional.length);
+    errorOut(`Unexpected positional arguments: ${extraArgs.join(', ')}`);
+  }
+
+  // Execute the command action
+  await command.action(
+    validatedOptions as ParsedOptions<typeof command.options>,
+    validatedFlags as ParsedFlags<typeof command.flags>,
+    validatedPositional as ParsedPositional<typeof command.positional>
+  );
 }

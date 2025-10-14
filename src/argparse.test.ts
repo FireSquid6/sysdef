@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { parseArgs, filterArgs } from "./argparse";
+import { parseArgs, filterArgs, executeArgs, flag, option, positional, command } from "./argparse";
 
 describe("parseArgs", () => {
   test("should parse empty args", () => {
