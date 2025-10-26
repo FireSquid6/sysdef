@@ -17,7 +17,7 @@
     // Path mapping
     "baseUrl": ".",
     "paths": {
-      "@src/*": ["./sysdef-src/*"]
+      "@src/*": ["../package/src/*"]
     },
 
     // Best practices
@@ -31,5 +31,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
+
   }
 }
