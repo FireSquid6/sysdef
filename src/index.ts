@@ -1,18 +1,40 @@
-
 import { flag, option, positional, command, executeArgs, parseArgs, filterArgs } from "./argparse";
+import os from "os";
+import path from "path";
+import { loadModules, loadProviders, loadVariables } from "./loaders";
+import { Lockfile } from "./lockfile";
+import { dryFilesystem, normalFilesystem } from "./connections";
+import { syncModules } from "./sysdef";
 
 const program = {
   sync: command({
     flags: [
-      flag({ name: "no-remove", alternatives: ["K"] }),
       flag({ name: "dry-run", alternatives: ["D"] }),
-      flag({ name: "only-dotfiles", alternatives: ["F"] }),
     ],
     options: [],
     positional: [],
     subcommands: undefined,
-    action(options, flags, positional) {
-        
+    async action(options, flags, positional) {
+      // TODO - make the cli work properly
+      const dryRun: boolean = true;
+      const rootDir = path.join(os.homedir(), "sysdef");
+
+      const modules = await loadModules(rootDir, dryRun);
+      const providers = await loadProviders(rootDir, dryRun);
+      const store = await loadVariables(rootDir);
+
+      const lockfile = new Lockfile();
+      lockfile.readFromFile(path.join(rootDir, "sysdef-lock.json"));
+
+      const filesystem = dryRun ? dryFilesystem : normalFilesystem;
+
+      await syncModules({
+        modules,
+        providers,
+        lockfile,
+        store,
+        filesystem
+      });
     },
   }),
   update: command({
@@ -38,6 +60,11 @@ const program = {
   })
 }
 
+
+// defaults to $HOME/sysdef. You could change this if you'd like! 
+function getRootDir() {
+
+}
 
 const filtered = filterArgs(process.argv);
 const parsed = parseArgs(filtered);
