@@ -1,5 +1,5 @@
 
-import { flag, option, positional, command } from "./argparse";
+import { flag, option, positional, command, executeArgs, parseArgs, filterArgs } from "./argparse";
 
 const program = {
   sync: command({
@@ -32,9 +32,14 @@ const program = {
     positional: [],
     subcommands: [
     ],
-    action: (options, flags, positional) {
+    action(options, flags, positional) {
       console.log("Manage command and subcommands still under construction!")
     },
   })
 }
 
+
+const filtered = filterArgs(process.argv);
+const parsed = parseArgs(filtered);
+
+await executeArgs(parsed, program, "sysdef");

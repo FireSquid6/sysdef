@@ -1,3 +1,7 @@
+import path from "path";
+import type { Filesystem } from "./connections";
+import { errorOut } from "./argparse";
+import type { Lockfile } from "./lockfile";
 
 // used to store and fill in variables
 export class VariableStore {
@@ -76,9 +80,11 @@ export class VariableStore {
   }
 }
 
+export const ANY_VERSION_STRING = "_*_";
+
 export interface PackageInfo {
   name: string;
-  version: string;
+  version: string; 
   provider: string;
 }
 
@@ -145,7 +151,7 @@ export interface Provider {
 // the contents of the file. You can use the variable store in this case. 
 //
 // It's a difference between a symlink and a generated file.
-export type File = string | (() => string);
+export type File = string | ((v: VariableStore) => string);
 
 
 export interface Module {
@@ -156,30 +162,180 @@ export interface Module {
   readonly directories: Record<string, string>;  
   readonly files: Record<string, File>;
   
-  // factory files are made and include all of the variables
-  readonly factoryFiles: Record<string, string>;
-
-  readonly onEnable?: (s: Shell) => Promise<void>;
-  readonly onDisable?: (s: Shell) => Promise<void>;
   readonly onEverySync?: (s: Shell) => Promise<void>;
 }
 
-export type ProviderGenerator = (s: Shell, v: VariableStore) => Provider;
-export type ModuleGenerator = (s: Shell, v: VariableStore) => Module;
+export type ProviderGenerator = () => Provider;
+export type ModuleGenerator = () => Module;
 
 
+export function getPackageList(modules: Module[], lockfile: Lockfile): PackageInfo[] {
+  const allPackages: PackageInfo[] = [];
 
-export async function syncPackages(modules: Module[], providers: Provider[]) {
-  // sync all dotfiles
+  // how we ensure we don't do two contradicting versions
+  // note that the first string is <provider>:<package>;
+  const seenVersions: Map<string, { module: string, version: string }> = new Map();
+
+  for (const mod of modules) {
+    for (const [provider, packages] of Object.entries(mod.packages)) {
+
+      const packageInfos: PackageInfo[] = packages.map(p => {
+        const split = p.split(":");
+        switch (split.length) {
+          case 1:
+            const name = split[0]!;
+            const version = lockfile.getVersion(provider, name) ?? ANY_VERSION_STRING;
+            return {
+              name,
+              version,
+              provider,
+            }
+          case 2:
+            return {
+              name: split[0]!,
+              provider: provider,
+              version: split[1]!,
+            }
+          default:
+            errorOut(`Improper package name: ${p}`);
+        }
+      });
+
+      for (const p of packageInfos) {
+        const k = `${p.provider}:${p.name}`;
+        if (seenVersions.has(k)) {
+          const seen = seenVersions.get(k)!;
+          if (seen.version !== p.version) {
+            errorOut(`Requested two different versions for package ${p.name}: ${seen.version} in ${seen.module} and ${p.version} in ${mod.name}`);
+          }
+        } else {
+          seenVersions.set(k, {
+            version: p.version,
+            module: mod.name,
+          });
+        }
+
+        allPackages.push(p);
+      }
+    }
+  }
+
+  return allPackages;
+
 
 }
 
-export async function syncFiles(modules: Module[]) {
+export async function syncPackages(allPackages: Map<string, PackageInfo[]>, providers: Provider[]) {
+  for (const provider of providers) {
+    const packages = allPackages.get(provider.name) ?? [];
+    const toInstall: PackageInfo[] = [];
+    const noChange: PackageInfo[] = [];
+    const toUninstall: PackageInfo[] = [];
 
+    const alreadyInstalledInfos = await provider.getInstalled();
+    const alreadyInstalledKeys = new Set(alreadyInstalledInfos.map(p => `${p.provider}:${p.name}:${p.version}`));
+    const packageKeys = new Set(packages.map(p => `${p.provider}:${p.name}:${p.version}`));
+
+
+    for (const p of packages) {
+      const k = `${p.provider}:${p.name}:${p.version}`;
+      if (alreadyInstalledKeys.has(k)) {
+        noChange.push(p);
+      } else {
+        toInstall.push(p);
+      }
+    }
+
+    for (const p of alreadyInstalledInfos) {
+      const k = `${p.provider}:${p.name}:${p.version}`;
+      if (!packageKeys.has(k)) {
+        toUninstall.push(p);
+      }
+    }
+
+
+    console.log(`MANAGING PACKGES FOR: ${provider.name}`);
+    for (const p of toInstall) {
+      console.log(`  INSTALLING: ${p.name}:${p.version}`);
+    }
+    for (const p of toUninstall) {
+      console.log(`  REMOVING: ${p.name}:${p.version}`);
+    }
+
+    await provider.install(toInstall);
+    await provider.uninstall(toUninstall.map(p => p.name));
+  }
+}
+
+export async function updateLockfile(providers: Provider[], lockfile: Lockfile) {
+  for (const provider of providers) {
+    const packages = await provider.getInstalled();
+    for (const p of packages) {
+      lockfile.setVersion(p.provider, p.name, p.version);
+    }
+  }
+}
+
+
+export function syncFiles(modules: Module[], baseStore: VariableStore, fs: Filesystem) {
+  // make symlinks
+  for (const mod of modules) {
+    const store = baseStore.branchOff(mod.variables);
+
+    for (const [fp, file] of Object.entries(mod.files)) {
+      const destinationFilepath = store.fillIn(fp)
+      if (typeof file === "string") {
+        const sourceFilepath = path.resolve(path.join("./dotfiles", file));
+        fs.ensureSymlink(destinationFilepath, sourceFilepath);
+      } else {
+        const sourceContents = file(store);
+        fs.writeFile(destinationFilepath, sourceContents);
+      }
+    }
+
+    for (const [directoryPath, directory] of Object.entries(mod.directories)) {
+      const destinationPath = store.fillIn(directoryPath);
+       
+      const sourcePath = path.resolve(path.join("./dotfiles", directory));
+      fs.ensureSymlink(destinationPath, sourcePath);
+    }
+  }
 }
 
 export async function runEvents(modules: Module[]) {
-
+  console.log("Events not created yet");
 }
 
+export interface SyncContext {
+  modules: Module[];
+  providers: Provider[];
+  lockfile: Lockfile;
+  store: VariableStore;
+  filesystem: Filesystem;
+}
 
+export async function syncModules({ modules, providers, lockfile, store, filesystem }: SyncContext) {
+  console.log("SYNCING FILES:");
+  syncFiles(modules, store, filesystem);
+
+  console.log("SYNCING PACKAGES:");
+  const list = getPackageList(modules, lockfile);
+
+  // we use a hash map to make things faster
+  const map: Map<string, PackageInfo[]> = new Map();
+
+  for (const p of list) {
+    if (!map.has(p.provider)) {
+      map.set(p.provider, [p]);
+    } else {
+      const current = map.get(p.provider)!;
+      current.push(p);
+      map.set(p.provider, current);
+    }
+  }
+
+  await syncPackages(map, providers);
+
+  console.log("RUNNING EVENTS:");
+  await runEvents(modules);
+}
