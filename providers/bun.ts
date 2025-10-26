@@ -1,4 +1,4 @@
-import type { ProviderGenerator, Shell } from "../src/sysdef";
+import type { PackageInfo, ProviderGenerator, Shell } from "../src/sysdef";
 import os from "os";
 import fs from "fs";
 import path from "path";
@@ -10,15 +10,15 @@ const packageJsonSchema = v.obj({
   dependencies: v.record(v.string(), v.string()),
 })
 
-const mod: ProviderGenerator = (run: Shell) => {
+const provider: ProviderGenerator = (run: Shell) => {
   return {
     name: "bun",
     // this should be able to handle the case where a package is requested to be intsalled of a different version! 
-    async install(packages) {
+    async install(packages: PackageInfo[]) {
       await Promise.all(packages.map(p => run(`bun install -g ${p.name}@${p.version}`)));
     },
 
-    async uninstall(packages) {
+    async uninstall(packages: string[]) {
       await Promise.all(packages.map(p => run(`bun remove -g ${p}`)))
     },
     async getInstalled() {
@@ -46,13 +46,10 @@ const mod: ProviderGenerator = (run: Shell) => {
         }
       });
     },
-    async update(packages) {
+    async update(packages: string[]) {
       await Promise.all(packages.map(p => run(`bun update -g ${p}`)))
-    },
-    async initialize() {
-      // nothing needs to be done!
     },
   }
 }
 
-export default mod;
+export default provider;
