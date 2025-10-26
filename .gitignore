@@ -34,4 +34,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .DS_Store
 
 # we gitgnore this because it's just a copy of the src
-testing-workspace/sysdef-src
+example-workspace/sysdef-src
