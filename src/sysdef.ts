@@ -142,7 +142,6 @@ export interface Provider {
   uninstall: (packages: string[]) => Promise<void>;
   getInstalled: () => Promise<PackageInfo[]>;
   update: (packages: string[]) => Promise<void>;
-  initialize: () => Promise<void>;
 }
 
 
@@ -165,8 +164,9 @@ export interface Module {
   readonly onEverySync?: (s: Shell) => Promise<void>;
 }
 
-export type ProviderGenerator = () => Provider;
-export type ModuleGenerator = () => Module;
+export type ProviderGenerator = (run: Shell) => Provider;
+export type ModuleGenerator = (run: Shell) => Module;
+export type VariablesGenerator = () => Record<string, string>;
 
 
 export function getPackageList(modules: Module[], lockfile: Lockfile): PackageInfo[] {
