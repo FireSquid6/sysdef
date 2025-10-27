@@ -7,6 +7,16 @@ import { dryFilesystem, normalFilesystem } from "./connections";
 import { syncModules } from "./sysdef";
 
 const program = {
+  _default: command({
+    flags: [],
+    options: [],
+    positional: [],
+    subcommands: undefined,
+
+    async action() {
+      console.log("This is your sysdef installation!");
+    },
+  }),
   sync: command({
     flags: [
       flag({ name: "dry-run", alternatives: ["D"] }),
