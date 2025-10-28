@@ -1,6 +1,7 @@
 import path from "path";
 import type { Filesystem } from "./connections";
 import type { Lockfile } from "./lockfile";
+import { PackageSet } from "./package-set";
 
 export function errorOut(error: string): never {
   console.log(`Fatal error: ${error}`);
@@ -210,7 +211,7 @@ export function getPackageList(modules: Module[], lockfile: Lockfile): PackageIn
         const k = `${p.provider}:${p.name}`;
         if (seenVersions.has(k)) {
           const seen = seenVersions.get(k)!;
-          if (seen.version !== p.version) {
+          if (versionMatches(seen.version, p.version)) {
             errorOut(`Requested two different versions for package ${p.name}: ${seen.version} in ${seen.module} and ${p.version} in ${mod.name}`);
           }
         } else {
@@ -226,7 +227,14 @@ export function getPackageList(modules: Module[], lockfile: Lockfile): PackageIn
   }
 
   return allPackages;
+}
 
+function versionMatches(v1: string, v2: string) {
+  if (v1 === ANY_VERSION_STRING || v2 === ANY_VERSION_STRING) {
+    return true;
+  }
+
+  return v1 === v2;
 
 }
 
@@ -238,13 +246,16 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
     const toUninstall: PackageInfo[] = [];
 
     const alreadyInstalledInfos = await provider.getInstalled();
-    const alreadyInstalledKeys = new Set(alreadyInstalledInfos.map(p => `${p.provider}:${p.name}:${p.version}`));
-    const packageKeys = new Set(packages.map(p => `${p.provider}:${p.name}:${p.version}`));
+    const installedSet = new PackageSet();
+    const requestedSet = new PackageSet();
 
+    installedSet.addList(alreadyInstalledInfos);
+    requestedSet.addList(packages);
 
     for (const p of packages) {
-      const k = `${p.provider}:${p.name}:${p.version}`;
-      if (alreadyInstalledKeys.has(k)) {
+      if (installedSet.has(p)) {
+        noChange.push(p);
+      } else if (p.version === ANY_VERSION_STRING && installedSet.hasAnyVersion(p)) {
         noChange.push(p);
       } else {
         toInstall.push(p);
@@ -252,12 +263,10 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
     }
 
     for (const p of alreadyInstalledInfos) {
-      const k = `${p.provider}:${p.name}:${p.version}`;
-      if (!packageKeys.has(k)) {
+      if (!requestedSet.hasAnyVersion(p)) {
         toUninstall.push(p);
       }
     }
-
 
     console.log(`MANAGING PACKGES FOR: ${provider.name}`);
     for (const p of toInstall) {
