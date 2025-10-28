@@ -181,7 +181,7 @@ export class Command<
     return this;
   }
 
-  parse(args: string[] = process.argv.slice(2)): ParsedArgs<TArgs, TFlags, TOptions> {
+  parse(args: string[]): ParsedArgs<TArgs, TFlags, TOptions> {
     const result: any = { _: [] };
     
     // Initialize defaults
@@ -322,7 +322,7 @@ export class Command<
     }
   }
 
-  async execute(args?: string[]): Promise<void> {
+  async execute(args: string[]): Promise<void> {
     const parsed = this.parse(args);
     if (this._handler) {
       await this._handler(parsed);

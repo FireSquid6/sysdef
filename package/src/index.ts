@@ -12,18 +12,17 @@ function getRootDir() {
 }
 
 const set = flagSet()
+  .option("configDir", { short: "v", required: false })
+  
 
 
 const cli = command("sysdef", "The hackable computer configuration system")
-  .flag("verbose", { short: "v" })
-  .option("configDir", { short: "v", required: true })
-  .action(async (args) => {
-    console.log(args.verbose);
-    console.log(args.configDir);
-    console.log("This is the basic action");
+  .action(async () => {
+    console.log(cli.help());
   })
 
 cli.subcommand("sync", "Sync all packages, modules, and files")
+  .use(set)
   .action(async (args) => {
     const dryRun: boolean = true;
     // const rootDir = getRootDir();
@@ -55,4 +54,5 @@ cli.subcommand("hello")
   })
 
 
-await cli.execute();
+
+export { cli }
