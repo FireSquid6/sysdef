@@ -1,4 +1,4 @@
-import { command } from './src/argparse';
+import { command, flagSet, optionSet, mixedSet } from "../src/argparse";
 
 // Example with strict typing
 const cli = command('myapp', 'My CLI application')
@@ -24,7 +24,6 @@ const cli = command('myapp', 'My CLI application')
 
 // Subcommand example with typing
 // Example with reusable flag sets
-import { flagSet, optionSet, mixedSet } from './src/argparse';
 
 // Create common flag sets that can be reused
 const commonFlags = flagSet()
