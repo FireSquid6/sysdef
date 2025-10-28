@@ -22,21 +22,20 @@ const cli = command("sysdef", "The hackable computer configuration system")
   })
 
 cli.subcommand("sync", "Sync all packages, modules, and files")
-  .use(set)
+  .flag("dryRun", { short: "d" })
   .action(async (args) => {
-    const dryRun: boolean = true;
     // const rootDir = getRootDir();
     const rootDir = process.cwd();
 
-    const modules = await loadModules(rootDir, dryRun);
-    const providers = await loadProviders(rootDir, dryRun);
+    const modules = await loadModules(rootDir, args.dryRun);
+    const providers = await loadProviders(rootDir, args.dryRun);
     const store = await loadVariables(rootDir);
 
     const lockfilePath = path.join(rootDir, "sysdef-lock.json");
     const lockfile = new Lockfile();
     lockfile.readFromFile(lockfilePath);
 
-    const filesystem = dryRun ? dryFilesystem : normalFilesystem;
+    const filesystem = args.dryRun ? dryFilesystem : normalFilesystem;
 
     await syncModules({
       modules,

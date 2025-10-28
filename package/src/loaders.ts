@@ -7,7 +7,7 @@ const validExtensions = new Set([".ts", ".tsx", ".js", ".jsx"]);
 export async function loadModules(rootDir: string, dryRun: boolean): Promise<Module[]> {
   const modules: Module[] = [];
   const modulesDirectory = path.join(rootDir, "modules");
-  console.log(`LOADING MODULES FROM ${modulesDirectory}`);
+  console.log(`\nLOADING MODULES FROM ${modulesDirectory}`);
 
   if (!fs.existsSync(modulesDirectory)) {
     errorOut(`No modules directory in ${rootDir}`);
@@ -44,7 +44,7 @@ export async function loadModules(rootDir: string, dryRun: boolean): Promise<Mod
 export async function loadProviders(rootDir: string, dryRun: boolean): Promise<Provider[]> {
   const providers: Provider[] = [];
   const providersDirectory = path.join(rootDir, "providers");
-  console.log(`LOADING PROVIDERS FROM ${providersDirectory}`);
+  console.log(`\nLOADING PROVIDERS FROM ${providersDirectory}`);
 
   const shell = dryRun ? dryShell : defaultShell;
 

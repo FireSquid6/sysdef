@@ -268,12 +268,15 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
       }
     }
 
-    console.log(`MANAGING PACKGES FOR: ${provider.name}`);
+    console.log(`  MANAGING PACKGES FOR: ${provider.name}`);
+    for (const p of alreadyInstalledInfos) {
+      console.log(`    OK: ${p.name}:${p.version}`);
+    }
     for (const p of toInstall) {
-      console.log(`  INSTALLING: ${p.name}:${p.version}`);
+      console.log(`    INSTALLING: ${p.name}:${p.version}`);
     }
     for (const p of toUninstall) {
-      console.log(`  REMOVING: ${p.name}:${p.version}`);
+      console.log(`    REMOVING: ${p.name}:${p.version}`);
     }
 
     await provider.install(toInstall);
@@ -293,6 +296,10 @@ export async function updateLockfile(providers: Provider[], lockfile: Lockfile) 
 
 export function syncFiles(modules: Module[], baseStore: VariableStore, fs: Filesystem) {
   // make symlinks
+  if (modules.length === 0) {
+    console.log("No files to sync!");
+  }
+
   for (const mod of modules) {
     const store = baseStore.branchOff(mod.variables);
 
@@ -301,9 +308,11 @@ export function syncFiles(modules: Module[], baseStore: VariableStore, fs: Files
       if (typeof file === "string") {
         const sourceFilepath = path.resolve(path.join("./dotfiles", file));
         fs.ensureSymlink(destinationFilepath, sourceFilepath);
+        console.log(`Linked file: ${sourceFilepath} -> ${destinationFilepath}`);
       } else {
         const sourceContents = file(store);
         fs.writeFile(destinationFilepath, sourceContents);
+        console.log(`Generated: ${destinationFilepath}`);
       }
     }
 
@@ -312,6 +321,7 @@ export function syncFiles(modules: Module[], baseStore: VariableStore, fs: Files
        
       const sourcePath = path.resolve(path.join("./dotfiles", directory));
       fs.ensureSymlink(destinationPath, sourcePath);
+      console.log(`Linked directory: ${sourcePath} -> ${destinationPath}`);
     }
   }
 }
@@ -329,10 +339,10 @@ export interface SyncContext {
 }
 
 export async function syncModules({ modules, providers, lockfile, store, filesystem }: SyncContext) {
-  console.log("SYNCING FILES:");
+  console.log("\nSYNCING FILES:");
   syncFiles(modules, store, filesystem);
 
-  console.log("SYNCING PACKAGES:");
+  console.log("\nSYNCING PACKAGES:");
   const list = getPackageList(modules, lockfile);
 
   // we use a hash map to make things faster
@@ -350,6 +360,6 @@ export async function syncModules({ modules, providers, lockfile, store, filesys
 
   await syncPackages(map, providers);
 
-  console.log("RUNNING EVENTS:");
+  console.log("\nRUNNING EVENTS:");
   await runEvents(modules);
 }

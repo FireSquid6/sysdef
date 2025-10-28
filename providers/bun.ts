@@ -1,4 +1,4 @@
-import type { PackageInfo, ProviderGenerator, Shell } from "@src/sysdef";
+import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "@src/sysdef";
 import os from "os";
 import fs from "fs";
 import path from "path";
@@ -15,7 +15,10 @@ const provider: ProviderGenerator = (run: Shell) => {
     name: "bun",
     // this should be able to handle the case where a package is requested to be intsalled of a different version! 
     async install(packages: PackageInfo[]) {
-      await Promise.all(packages.map(p => run(`bun install -g ${p.name}@${p.version}`)));
+      await Promise.all(packages.map(p => run(`bun add -g ${p.name}@${p.version === ANY_VERSION_STRING
+        ? "latest"
+        : p.version
+      } -E`)));
     },
 
     async uninstall(packages: string[]) {
