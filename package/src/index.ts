@@ -4,14 +4,14 @@ import { loadModules, loadProviders, loadVariables } from "./loaders";
 import { Lockfile } from "./lockfile";
 import { dryFilesystem, normalFilesystem } from "./connections";
 import { syncModules } from "./sysdef";
-import { command, mixedSet } from "./argparse";
+import { command, flagSet } from "./argparse";
 
 // defaults to $HOME/sysdef. You could change this if you'd like! 
 function getRootDir() {
   return path.join(os.homedir(), "sysdef");
 }
 
-const set = mixedSet()
+const set = flagSet()
 
 
 const cli = command("sysdef", "The hackable computer configuration system")
