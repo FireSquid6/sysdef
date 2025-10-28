@@ -1,4 +1,4 @@
-import { type Module, type ProviderGenerator, type Provider, dryShell, defaultShell, type ModuleGenerator, VariableStore, type VariablesGenerator } from "./sysdef";
+import { type Module, type ProviderGenerator, type Provider, dryShell, defaultShell, type ModuleGenerator, VariableStore, type VariablesGenerator, errorOut } from "./sysdef";
 import path from "path";
 import fs from "fs";
 
@@ -7,7 +7,11 @@ const validExtensions = new Set([".ts", ".tsx", ".js", ".jsx"]);
 export async function loadModules(rootDir: string, dryRun: boolean): Promise<Module[]> {
   const modules: Module[] = [];
   const modulesDirectory = path.join(rootDir, "modules");
-  console.log(`LOADING PROVIDERS FROM ${modulesDirectory}`);
+  console.log(`LOADING MODULES FROM ${modulesDirectory}`);
+
+  if (!fs.existsSync(modulesDirectory)) {
+    errorOut(`No modules directory in ${rootDir}`);
+  }
 
   const shell = dryRun ? dryShell : defaultShell;
 
@@ -43,6 +47,10 @@ export async function loadProviders(rootDir: string, dryRun: boolean): Promise<P
   console.log(`LOADING PROVIDERS FROM ${providersDirectory}`);
 
   const shell = dryRun ? dryShell : defaultShell;
+
+  if (!fs.existsSync(providersDirectory)) {
+    errorOut(`No providers directory in ${rootDir}`);
+  }
 
   for (const fp of fs.readdirSync(providersDirectory)) {
     const filepath = path.join(providersDirectory, fp);

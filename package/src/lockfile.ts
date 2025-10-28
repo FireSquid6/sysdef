@@ -36,6 +36,12 @@ export class Lockfile {
   }
   
   readFromFile(filepath: string) {
+    if (!fs.existsSync(filepath)) {
+      // if the filepath doesn't exist, we can't read from it. Therefore,
+      // the lockfile is empty
+      return;
+    }
+
     const contents = fs.readFileSync(filepath).toString();
     const json = JSON.parse(contents);
     const data = v.parseSafe(json, lockfileSchema);

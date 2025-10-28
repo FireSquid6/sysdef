@@ -58,13 +58,13 @@ export class Command<
   TFlags extends ReadonlyArray<FlagConfig<any>> = [],
   TOptions extends ReadonlyArray<OptionConfig<any>> = []
 > {
-  private _name: string;
-  private _description?: string;
-  private _arguments: ArgumentConfig<any>[] = [];
-  private _flags: FlagConfig<any>[] = [];
-  private _options: OptionConfig<any>[] = [];
-  private _subcommands: Map<string, Command<any, any, any>> = new Map();
-  private _handler?: (args: ParsedArgs<TArgs, TFlags, TOptions>) => void | Promise<void>;
+  public _name: string;
+  public _description?: string;
+  public _arguments: ArgumentConfig<any>[] = [];
+  public _flags: FlagConfig<any>[] = [];
+  public _options: OptionConfig<any>[] = [];
+  public _subcommands: Map<string, Command<any, any, any>> = new Map();
+  public _handler?: (args: ParsedArgs<TArgs, TFlags, TOptions>) => void | Promise<void>;
 
   constructor(name: string, description?: string) {
     this._name = name;
@@ -170,10 +170,13 @@ export class Command<
     return newCommand;
   }
 
-  subcommand(name: string, description?: string): Command<[], [], []> {
+  subcommand(name: string, description?: string): SubcommandBuilder {
+    if (this._subcommands.has(name)) {
+      return new SubcommandBuilder(this._subcommands.get(name) as any);
+    }
     const subcmd = new Command<[], [], []>(name, description);
     this._subcommands.set(name, subcmd as any);
-    return subcmd;
+    return new SubcommandBuilder(subcmd);
   }
 
   action(handler: (args: ParsedArgs<TArgs, TFlags, TOptions>) => void | Promise<void>): this {
@@ -323,6 +326,17 @@ export class Command<
   }
 
   async execute(args: string[]): Promise<void> {
+    // Check for subcommand first
+    if (args.length > 0) {
+      const firstArg = args[0];
+      if (firstArg && this._subcommands.has(firstArg)) {
+        const subcmd = this._subcommands.get(firstArg)!;
+        const remainingArgs = args.slice(1);
+        return subcmd.execute(remainingArgs);
+      }
+    }
+    
+    // Parse and execute current command
     const parsed = this.parse(args);
     if (this._handler) {
       await this._handler(parsed);
@@ -409,6 +423,56 @@ export class FlagSet<
     config: Omit<OptionConfig<TType>, 'long'> = {} as any
   ): FlagSet<TFlags, [...TOptions, OptionConfig<TType> & { long: TName }]> {
     return new FlagSet(this.flags, [...this.options, { long, ...config }] as const);
+  }
+}
+
+export class SubcommandBuilder {
+  constructor(private command: Command<any, any, any>) {}
+
+  argument<TName extends string, TType extends keyof TypeMap = 'string'>(
+    name: TName, 
+    config: Omit<ArgumentConfig<TType>, 'name'> = {} as any
+  ): this {
+    this.command._arguments.push({ name, ...config } as any);
+    return this;
+  }
+
+  flag<TName extends string, TType extends keyof TypeMap = 'boolean'>(
+    long: TName, 
+    config: Omit<FlagConfig<TType>, 'long'> = {} as any
+  ): this {
+    this.command._flags.push({ long, ...config } as any);
+    return this;
+  }
+
+  option<TName extends string, TType extends keyof TypeMap = 'string'>(
+    long: TName, 
+    config: Omit<OptionConfig<TType>, 'long'> = {} as any
+  ): this {
+    this.command._options.push({ long, ...config } as any);
+    return this;
+  }
+
+  use<TNewFlags extends ReadonlyArray<FlagConfig<any>>, TNewOptions extends ReadonlyArray<OptionConfig<any>>>(
+    set: FlagSet<TNewFlags, TNewOptions>
+  ): this {
+    this.command._flags.push(...set.flags as any);
+    this.command._options.push(...set.options as any);
+    return this;
+  }
+
+  action(handler: (args: any) => void | Promise<void>): this {
+    this.command._handler = handler;
+    return this;
+  }
+
+  subcommand(name: string, description?: string): SubcommandBuilder {
+    if (this.command._subcommands.has(name)) {
+      return new SubcommandBuilder(this.command._subcommands.get(name) as any);
+    }
+    const subcmd = new Command<[], [], []>(name, description);
+    this.command._subcommands.set(name, subcmd as any);
+    return new SubcommandBuilder(subcmd);
   }
 }
 

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, mock } from "bun:test";
 import { command, flagSet } from "../src/argparse";
 
 describe("CLI Argparse Library", () => {
@@ -8,53 +8,65 @@ describe("CLI Argparse Library", () => {
     expect(cli.help()).toContain('A test command');
   });
 
-  test("should parse basic arguments", () => {
+  test("should parse basic arguments", async () => {
+    const mockAction = mock((args) => {
+      expect(args.file).toBe('input.txt');
+      expect(args._).toEqual([]);
+    });
+
     const cli = command('test')
       .argument('file', { type: 'string', required: true })
-      .action((args) => {
-        expect(args.file).toBe('input.txt');
-        expect(args._).toEqual([]);
-      });
+      .action(mockAction);
     
-    cli.execute(['input.txt']);
+    await cli.execute(['input.txt']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 
-  test("should parse flags", () => {
+  test("should parse flags", async () => {
+    const mockAction = mock((args) => {
+      expect(args.verbose).toBe(true);
+      expect(args.debug).toBe(true);
+    });
+
     const cli = command('test')
       .flag('verbose', { short: 'v' })
       .flag('debug', { type: 'boolean' })
-      .action((args) => {
-        expect(args.verbose).toBe(true);
-        expect(args.debug).toBe(true);
-      });
+      .action(mockAction);
     
-    cli.execute(['--verbose', '--debug']);
+    await cli.execute(['--verbose', '--debug']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 
-  test("should parse options", () => {
+  test("should parse options", async () => {
+    const mockAction = mock((args) => {
+      expect(args.output).toBe('result.txt');
+      expect(args.count).toBe(42);
+    });
+
     const cli = command('test')
       .option('output', { short: 'o', type: 'string', required: true })
       .option('count', { type: 'number' })
-      .action((args) => {
-        expect(args.output).toBe('result.txt');
-        expect(args.count).toBe(42);
-      });
+      .action(mockAction);
     
-    cli.execute(['--output', 'result.txt', '--count', '42']);
+    await cli.execute(['--output', 'result.txt', '--count', '42']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 
-  test("should handle mixed arguments, flags and options", () => {
+  test("should handle mixed arguments, flags and options", async () => {
+    const mockAction = mock((args) => {
+      expect(args.input).toBe('file.txt');
+      expect(args.verbose).toBe(true);
+      expect(args.output).toBe('out.txt');
+    });
+
     const cli = command('test')
       .argument('input', { type: 'string', required: true })
       .flag('verbose', { short: 'v' })
       .option('output', { short: 'o', type: 'string' })
-      .action((args) => {
-        expect(args.input).toBe('file.txt');
-        expect(args.verbose).toBe(true);
-        expect(args.output).toBe('out.txt');
-      });
+      .action(mockAction);
     
-    cli.execute(['file.txt', '-v', '-o', 'out.txt']);
+    await cli.execute(['file.txt', '-v', '-o', 'out.txt']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 
   test("should throw error for missing required arguments", () => {
@@ -71,15 +83,18 @@ describe("CLI Argparse Library", () => {
     expect(() => cli.parse([])).toThrow('Missing required option: --required');
   });
 
-  test("should support subcommands", () => {
+  test("should support subcommands", async () => {
+    const mockAction = mock((args) => {
+      expect(args.target).toBe('production');
+    });
+
     const cli = command('main');
-    const buildCmd = cli.subcommand('build', 'Build the project')
+    cli.subcommand('build', 'Build the project')
       .argument('target', { required: true })
-      .action((args) => {
-        expect(args.target).toBe('production');
-      });
+      .action(mockAction);
     
-    cli.execute(['build', 'production']);
+    await cli.execute(['build', 'production']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 
   test("should generate help text", () => {
@@ -99,7 +114,14 @@ describe("CLI Argparse Library", () => {
     expect(help).toContain('Output file');
   });
 
-  test("should support reusable flag sets with flags and options", () => {
+  test("should support reusable flag sets with flags and options", async () => {
+    const mockAction = mock((args) => {
+      expect(args.verbose).toBe(true);
+      expect(args.debug).toBe(true);
+      expect(args.output).toBe('file.txt');
+      expect(args.count).toBe(42);
+    });
+
     const commonSet = flagSet()
       .flag('verbose', { short: 'v' })
       .flag('debug')
@@ -108,17 +130,20 @@ describe("CLI Argparse Library", () => {
 
     const cli = command('test')
       .use(commonSet)
-      .action((args) => {
-        expect(args.verbose).toBe(true);
-        expect(args.debug).toBe(true);
-        expect(args.output).toBe('file.txt');
-        expect(args.count).toBe(42);
-      });
+      .action(mockAction);
 
-    cli.execute(['--verbose', '--debug', '--output', 'file.txt', '--count', '42']);
+    await cli.execute(['--verbose', '--debug', '--output', 'file.txt', '--count', '42']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 
-  test("should combine multiple flag sets", () => {
+  test("should combine multiple flag sets", async () => {
+    const mockAction = mock((args) => {
+      expect(args.verbose).toBe(true);
+      expect(args.debug).toBe(true);
+      expect(args.output).toBe('result.txt');
+      expect(args.format).toBe('json');
+    });
+
     const logFlags = flagSet()
       .flag('verbose', { short: 'v' })
       .flag('debug');
@@ -130,13 +155,59 @@ describe("CLI Argparse Library", () => {
     const cli = command('test')
       .use(logFlags)
       .use(outputSet)
-      .action((args) => {
-        expect(args.verbose).toBe(true);
-        expect(args.debug).toBe(true);
-        expect(args.output).toBe('result.txt');
-        expect(args.format).toBe('json');
-      });
+      .action(mockAction);
 
-    cli.execute(['--verbose', '--debug', '--output', 'result.txt', '--format', 'json']);
+    await cli.execute(['--verbose', '--debug', '--output', 'result.txt', '--format', 'json']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
+  });
+
+  test("should handle command without action", async () => {
+    const cli = command('test');
+    // Should not throw when no action is defined
+    await expect(cli.execute([])).resolves.toBeUndefined();
+  });
+
+  test("should handle flag defaults", async () => {
+    const mockAction = mock((args) => {
+      expect(args.verbose).toBe(false);
+      expect(args.count).toBe(10);
+    });
+
+    const cli = command('test')
+      .flag('verbose', { default: false })
+      .option('count', { type: 'number', default: 10 })
+      .action(mockAction);
+
+    await cli.execute([]);
+    expect(mockAction).toHaveBeenCalledTimes(1);
+  });
+
+  test("should handle short flags", async () => {
+    const mockAction = mock((args) => {
+      expect(args.verbose).toBe(true);
+      expect(args.output).toBe('test.txt');
+    });
+
+    const cli = command('test')
+      .flag('verbose', { short: 'v' })
+      .option('output', { short: 'o', type: 'string' })
+      .action(mockAction);
+
+    await cli.execute(['-v', '-o', 'test.txt']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
+  });
+
+  test("should handle extra positional arguments in _", async () => {
+    const mockAction = mock((args) => {
+      expect(args.input).toBe('main.txt');
+      expect(args._).toEqual(['extra1', 'extra2']);
+    });
+
+    const cli = command('test')
+      .argument('input', { required: true })
+      .action(mockAction);
+
+    await cli.execute(['main.txt', 'extra1', 'extra2']);
+    expect(mockAction).toHaveBeenCalledTimes(1);
   });
 });
