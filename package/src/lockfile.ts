@@ -1,6 +1,6 @@
 import fs from "fs";
 import { v } from "./validation";
-import { errorOut } from "./argparse";
+import { errorOut } from "./sysdef";
 
 
 export const lockfileSchema = v.record(v.string(), v.record(v.string(), v.string()))

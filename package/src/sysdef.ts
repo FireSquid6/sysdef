@@ -1,7 +1,12 @@
 import path from "path";
 import type { Filesystem } from "./connections";
-import { errorOut } from "./argparse";
 import type { Lockfile } from "./lockfile";
+
+export function errorOut(error: string): never {
+  console.log(`Fatal error: ${error}`);
+  process.exit(1);
+
+}
 
 // used to store and fill in variables
 export class VariableStore {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { VariableStore } from "./sysdef";
+import { VariableStore } from "../src/sysdef";
 
 describe("VariableStore", () => {
   describe("fillIn", () => {
