@@ -1,4 +1,4 @@
-import { command, flagSet, optionSet, mixedSet } from "../src/argparse";
+import { command, flagSet } from "../src/argparse";
 
 // Example with strict typing
 const cli = command('myapp', 'My CLI application')
@@ -31,18 +31,18 @@ const commonFlags = flagSet()
   .flag('debug', { description: 'Debug mode' })
   .flag('quiet', { short: 'q', description: 'Quiet mode' });
 
-const outputOptions = optionSet()
+const outputSet = flagSet()
   .option('output', { short: 'o', type: 'string', description: 'Output file' })
   .option('format', { type: 'string', description: 'Output format' });
 
-const mixedCommon = mixedSet()
+const buildCommon = flagSet()
   .flag('force', { short: 'f', description: 'Force operation' })
   .option('config', { short: 'c', type: 'string', description: 'Config file' });
 
 // Use the flag sets across multiple commands
 const buildCommand = command('build')
   .use(commonFlags)      // Adds verbose, debug, quiet flags
-  .use(outputOptions)    // Adds output, format options
+  .use(outputSet)        // Adds output, format options
   .argument('target', { required: true })
   .action(async (args) => {
     // All flags and options are typed!
@@ -65,9 +65,9 @@ const subBuildCmd = cli.subcommand('build', 'Build the project')
   });
 
 const deployCmd = command('deploy')
-  .use(commonFlags)      // Same flags as build
-  .use(mixedCommon)      // Adds force flag and config option
   .option('environment', { type: 'string', required: true })
+  .use(commonFlags)      // Same flags as build
+  .use(buildCommon)      // Adds force flag and config option
   .action(async (args) => {
     console.log(args.verbose);     // boolean
     console.log(args.force);       // boolean
