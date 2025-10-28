@@ -4,16 +4,12 @@ import { loadModules, loadProviders, loadVariables } from "./loaders";
 import { Lockfile } from "./lockfile";
 import { dryFilesystem, normalFilesystem } from "./connections";
 import { syncModules, updateLockfile } from "./sysdef";
-import { command, flagSet } from "./argparse";
+import { command } from "./argparse";
 
 // defaults to $HOME/sysdef. You could change this if you'd like! 
 function getRootDir() {
   return path.join(os.homedir(), "sysdef");
 }
-
-const set = flagSet()
-  .option("configDir", { short: "v", required: false })
-  
 
 
 const cli = command("sysdef", "The hackable computer configuration system")
@@ -24,8 +20,7 @@ const cli = command("sysdef", "The hackable computer configuration system")
 cli.subcommand("sync", "Sync all packages, modules, and files")
   .flag("dryRun", { short: "d" })
   .action(async (args) => {
-    // const rootDir = getRootDir();
-    const rootDir = process.cwd();
+    const rootDir = getRootDir();
 
     const modules = await loadModules(rootDir, args.dryRun);
     const providers = await loadProviders(rootDir, args.dryRun);
