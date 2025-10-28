@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { command } from "../src/argparse";
+import { command, flagSet, optionSet, mixedSet } from "../src/argparse";
 
 describe("CLI Argparse Library", () => {
   test("should create basic command", () => {
@@ -97,5 +97,65 @@ describe("CLI Argparse Library", () => {
     expect(help).toContain('Verbose output');
     expect(help).toContain('-o, --output');
     expect(help).toContain('Output file');
+  });
+
+  test("should support reusable flag sets", () => {
+    const commonFlags = flagSet()
+      .flag('verbose', { short: 'v' })
+      .flag('debug');
+
+    const cli = command('test')
+      .use(commonFlags)
+      .action((args) => {
+        expect(args.verbose).toBe(true);
+        expect(args.debug).toBe(true);
+      });
+
+    cli.execute(['--verbose', '--debug']);
+  });
+
+  test("should support reusable option sets", () => {
+    const commonOptions = optionSet()
+      .option('output', { short: 'o', type: 'string' })
+      .option('count', { type: 'number' });
+
+    const cli = command('test')
+      .use(commonOptions)
+      .action((args) => {
+        expect(args.output).toBe('file.txt');
+        expect(args.count).toBe(42);
+      });
+
+    cli.execute(['--output', 'file.txt', '--count', '42']);
+  });
+
+  test("should support mixed flag/option sets", () => {
+    const mixedCommon = mixedSet()
+      .flag('force', { short: 'f' })
+      .option('config', { type: 'string' });
+
+    const cli = command('test')
+      .use(mixedCommon)
+      .action((args) => {
+        expect(args.force).toBe(true);
+        expect(args.config).toBe('config.json');
+      });
+
+    cli.execute(['--force', '--config', 'config.json']);
+  });
+
+  test("should combine multiple sets", () => {
+    const flags = flagSet().flag('verbose', { short: 'v' });
+    const options = optionSet().option('output', { type: 'string' });
+
+    const cli = command('test')
+      .use(flags)
+      .use(options)
+      .action((args) => {
+        expect(args.verbose).toBe(true);
+        expect(args.output).toBe('result.txt');
+      });
+
+    cli.execute(['--verbose', '--output', 'result.txt']);
   });
 });

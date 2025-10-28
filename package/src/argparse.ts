@@ -148,6 +148,30 @@ export class Command<
     return newCommand;
   }
 
+  use<TNewFlags extends ReadonlyArray<FlagConfig<any>>, TNewOptions extends ReadonlyArray<OptionConfig<any>>>(
+    set: FlagSet<TNewFlags> | OptionSet<TNewOptions> | MixedSet<TNewFlags, TNewOptions>
+  ): Command<TArgs, any, any> {
+    const newCommand = new Command<TArgs, any, any>(this._name, this._description);
+    
+    newCommand._arguments = [...this._arguments];
+    
+    if (set instanceof FlagSet) {
+      newCommand._flags = [...this._flags, ...set.flags] as any;
+      newCommand._options = [...this._options];
+    } else if (set instanceof OptionSet) {
+      newCommand._flags = [...this._flags];
+      newCommand._options = [...this._options, ...set.options] as any;
+    } else if (set instanceof MixedSet) {
+      newCommand._flags = [...this._flags, ...set.flags] as any;
+      newCommand._options = [...this._options, ...set.options] as any;
+    }
+    
+    newCommand._subcommands = new Map(this._subcommands);
+    newCommand._handler = this._handler as any;
+    
+    return newCommand;
+  }
+
   subcommand(name: string, description?: string): Command<[], [], []> {
     const subcmd = new Command<[], [], []>(name, description);
     this._subcommands.set(name, subcmd as any);
@@ -360,6 +384,76 @@ export class Command<
 
     return help;
   }
+}
+
+export class FlagSet<TFlags extends ReadonlyArray<FlagConfig<any>> = []> {
+  constructor(public readonly flags: TFlags) {}
+
+  static create() {
+    return new FlagSet([] as const);
+  }
+
+  flag<TName extends string, TType extends keyof TypeMap = 'boolean'>(
+    long: TName, 
+    config: Omit<FlagConfig<TType>, 'long'> = {} as any
+  ): FlagSet<[...TFlags, FlagConfig<TType> & { long: TName }]> {
+    return new FlagSet([...this.flags, { long, ...config }] as const);
+  }
+}
+
+export class OptionSet<TOptions extends ReadonlyArray<OptionConfig<any>> = []> {
+  constructor(public readonly options: TOptions) {}
+
+  static create() {
+    return new OptionSet([] as const);
+  }
+
+  option<TName extends string, TType extends keyof TypeMap = 'string'>(
+    long: TName, 
+    config: Omit<OptionConfig<TType>, 'long'> = {} as any
+  ): OptionSet<[...TOptions, OptionConfig<TType> & { long: TName }]> {
+    return new OptionSet([...this.options, { long, ...config }] as const);
+  }
+}
+
+export class MixedSet<
+  TFlags extends ReadonlyArray<FlagConfig<any>> = [],
+  TOptions extends ReadonlyArray<OptionConfig<any>> = []
+> {
+  constructor(
+    public readonly flags: TFlags,
+    public readonly options: TOptions
+  ) {}
+
+  static create() {
+    return new MixedSet([] as const, [] as const);
+  }
+
+  flag<TName extends string, TType extends keyof TypeMap = 'boolean'>(
+    long: TName, 
+    config: Omit<FlagConfig<TType>, 'long'> = {} as any
+  ): MixedSet<[...TFlags, FlagConfig<TType> & { long: TName }], TOptions> {
+    return new MixedSet([...this.flags, { long, ...config }] as const, this.options);
+  }
+
+  option<TName extends string, TType extends keyof TypeMap = 'string'>(
+    long: TName, 
+    config: Omit<OptionConfig<TType>, 'long'> = {} as any
+  ): MixedSet<TFlags, [...TOptions, OptionConfig<TType> & { long: TName }]> {
+    return new MixedSet(this.flags, [...this.options, { long, ...config }] as const);
+  }
+}
+
+export function flagSet() {
+  return FlagSet.create();
+}
+
+export function optionSet() {
+  return OptionSet.create();
+}
+
+export function mixedSet() {
+  return MixedSet.create();
 }
 
 export function command(name: string, description?: string): Command<[], [], []> {
