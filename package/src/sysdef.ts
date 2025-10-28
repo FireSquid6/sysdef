@@ -295,11 +295,6 @@ export async function updateLockfile(providers: Provider[], lockfile: Lockfile) 
 
 
 export function syncFiles(modules: Module[], baseStore: VariableStore, fs: Filesystem) {
-  // make symlinks
-  if (modules.length === 0) {
-    console.log("No files to sync!");
-  }
-
   for (const mod of modules) {
     const store = baseStore.branchOff(mod.variables);
 
