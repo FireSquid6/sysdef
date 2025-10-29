@@ -59,11 +59,11 @@ export class VariableStore {
         newString += s[i];
       }
     }
-    
+
     if (insideBracket) {
       newString += "{" + substr;
     }
-    
+
     return newString;
   }
 
@@ -90,7 +90,7 @@ export const ANY_VERSION_STRING = "_*_";
 
 export interface PackageInfo {
   name: string;
-  version: string; 
+  version: string;
   provider: string;
 }
 
@@ -112,7 +112,7 @@ export const defaultShell: Shell = async (s, noThrow) => {
     stderr: "inherit",
     stdin: "ignore",
   });
-  
+
 
   let output = "";
   for await (const chunk of p.stdout) {
@@ -121,7 +121,7 @@ export const defaultShell: Shell = async (s, noThrow) => {
   }
 
   const code = await p.exited;
-  
+
   if (code !== 0 && !noThrow) {
     throw new Error(`Process called with ${s} returned exit code ${code}`);
   }
@@ -165,9 +165,9 @@ export interface Module {
   readonly variables: Record<string, string>;
 
   readonly packages: Record<string, string[]>;
-  readonly directories: Record<string, string>;  
+  readonly directories: Record<string, string>;
   readonly files: Record<string, File>;
-  
+
   readonly onEverySync?: (s: Shell) => Promise<void>;
 }
 
@@ -239,7 +239,7 @@ function versionMatches(v1: string, v2: string) {
 
 }
 
-export async function syncPackages(allPackages: Map<string, PackageInfo[]>, providers: Provider[]) {
+export async function syncPackages(allPackages: Map<string, PackageInfo[]>, providers: Provider[], noRemove: boolean) {
   for (const provider of providers) {
     const packages = allPackages.get(provider.name) ?? [];
     const toInstall: PackageInfo[] = [];
@@ -276,12 +276,16 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
     for (const p of toInstall) {
       console.log(`    INSTALLING: ${p.name}:${p.version}`);
     }
-    for (const p of toUninstall) {
-      console.log(`    REMOVING: ${p.name}:${p.version}`);
+    if (!noRemove) {
+      for (const p of toUninstall) {
+        console.log(`    REMOVING: ${p.name}:${p.version}`);
+      }
     }
 
     await provider.install(toInstall);
-    await provider.uninstall(toUninstall.map(p => p.name));
+    if (!noRemove) {
+      await provider.uninstall(toUninstall.map(p => p.name));
+    }
   }
 }
 
@@ -314,7 +318,7 @@ export function syncFiles(modules: Module[], baseStore: VariableStore, fs: Files
 
     for (const [directoryPath, directory] of Object.entries(mod.directories)) {
       const destinationPath = store.fillIn(directoryPath);
-       
+
       const sourcePath = path.resolve(path.join("./dotfiles", directory));
       fs.ensureSymlink(destinationPath, sourcePath);
       console.log(`Linked directory: ${sourcePath} -> ${destinationPath}`);
@@ -326,36 +330,3 @@ export async function runEvents(modules: Module[]) {
   console.log("Events not created yet");
 }
 
-export interface SyncContext {
-  modules: Module[];
-  providers: Provider[];
-  lockfile: Lockfile;
-  store: VariableStore;
-  filesystem: Filesystem;
-}
-
-export async function syncModules({ modules, providers, lockfile, store, filesystem }: SyncContext) {
-  console.log("\nSYNCING FILES:");
-  syncFiles(modules, store, filesystem);
-
-  console.log("\nSYNCING PACKAGES:");
-  const list = getPackageList(modules, lockfile);
-
-  // we use a hash map to make things faster
-  const map: Map<string, PackageInfo[]> = new Map();
-
-  for (const p of list) {
-    if (!map.has(p.provider)) {
-      map.set(p.provider, [p]);
-    } else {
-      const current = map.get(p.provider)!;
-      current.push(p);
-      map.set(p.provider, current);
-    }
-  }
-
-  await syncPackages(map, providers);
-
-  console.log("\nRUNNING EVENTS:");
-  await runEvents(modules);
-}
