@@ -6,9 +6,8 @@ const provider: ProviderGenerator = (run: Shell) => {
   return {
     name: "cargo",
     async checkInstallation() {
-      try {
-        await run(`which cargo`);
-      } catch (error) {
+      const result = await run(`which cargo`, true);
+      if (result.code !== 0) {
         throw new Error("cargo is not installed or not in PATH");
       }
     },

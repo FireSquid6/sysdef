@@ -13,6 +13,12 @@ const packageJsonSchema = v.obj({
 const provider: ProviderGenerator = (run: Shell) => {
   return {
     name: "bun",
+    async checkInstallation() {
+      const result = await run(`which bun`, true);
+      if (result.code !== 0) {
+        throw new Error("bun is not installed or not in PATH");
+      }
+    },
     // this should be able to handle the case where a package is requested to be intsalled of a different version! 
     async install(packages: PackageInfo[]) {
       await Promise.all(packages.map(p => run(`bun add -g ${p.name}@${p.version === ANY_VERSION_STRING

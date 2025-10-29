@@ -6,9 +6,8 @@ const provider: ProviderGenerator = (run: Shell) => {
   return {
     name: "yay",
     async checkInstallation() {
-      try {
-        await run(`which yay`);
-      } catch (error) {
+      const result = await run(`which yay`, true);
+      if (result.code !== 0) {
         throw new Error("yay is not installed or not in PATH");
       }
     },
