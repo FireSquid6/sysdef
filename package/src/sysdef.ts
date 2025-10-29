@@ -148,6 +148,7 @@ export interface Provider {
   uninstall: (packages: string[]) => Promise<void>;
   getInstalled: () => Promise<PackageInfo[]>;
   update: (packages: string[]) => Promise<void>;
+  checkInstallation?: () => Promise<void>;
 }
 
 
