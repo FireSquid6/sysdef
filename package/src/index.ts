@@ -8,7 +8,7 @@ import { Command } from "@commander-js/extra-typings";
 
 // defaults to $HOME/sysdef. You could change this if you'd like! 
 function getRootDir() {
-  return path.join(os.homedir(), "sysdef");
+  return process.env.SYSDEF_ROOT_DIR ?? path.join(os.homedir(), "sysdef");
 }
 
 
@@ -88,7 +88,7 @@ cli.command("providers")
   .description("Subcommand to list all of the installed providers")
   .action(async () => {
     const rootDir = getRootDir();
-    const providers = await loadProviders(rootDir, true);
+    const providers = await loadProviders(rootDir, false);
 
     for (const p of providers) {
       try {
@@ -98,8 +98,30 @@ cli.command("providers")
         console.log(`${p.name} failed when checking its own installation: ${(e as Error).message}`); 
       }
     }
+  });
 
-  })
+cli.command("list-installed")
+  .description("list the installed packages from an optional provider")
+  .argument("[provider]")
+  .action(async (provider) => {
+    const rootDir = getRootDir();
+    let providers = await loadProviders(rootDir, false);
+
+    if (provider !== undefined && providers.find(p => p.name === provider) === undefined) {
+      errorOut(`Provider ${provider} was not found.`);
+    }
+
+    if (provider) {
+      providers = providers.filter(p => p.name === provider);
+    }
+    for (const p of providers) {
+      console.log(`Currently installed packages for ${p.name}:`);
+      const packages = await p.getInstalled();
+      for (const pkg of packages) {
+        console.log(`  ${pkg.name}@${pkg.version}`);
+      }
+    }
+  });
 
 cli.command("hello")
   .action(() => {

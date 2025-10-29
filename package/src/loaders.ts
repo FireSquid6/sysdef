@@ -56,7 +56,6 @@ export async function loadProviders(rootDir: string, dryRun: boolean): Promise<P
     const filepath = path.join(providersDirectory, fp);
     const extension = path.extname(filepath);
     if (!validExtensions.has(extension)) {
-      console.log(`Skipping ${fp}, not a valid extension`);
       continue;
     }
 
