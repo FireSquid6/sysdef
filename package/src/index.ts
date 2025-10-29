@@ -3,7 +3,7 @@ import path from "path";
 import { loadModules, loadProviders, loadVariables } from "./loaders";
 import { Lockfile } from "./lockfile";
 import { dryFilesystem, normalFilesystem } from "./connections";
-import { syncPackages, runEvents, updateLockfile, syncFiles, getPackageList, type PackageInfo } from "./sysdef";
+import { syncPackages, runEvents, updateLockfile, syncFiles, getPackageList, type PackageInfo, errorOut } from "./sysdef";
 import { Command } from "@commander-js/extra-typings";
 
 // defaults to $HOME/sysdef. You could change this if you'd like! 
@@ -20,12 +20,18 @@ const cli = new Command()
   });
 
 
-cli.command("sync")
+const syncCommand = cli.command("sync")
   .description("Sync all packages, modules, and files")
   .option("-d, --dry-run", "do a dry-run and don't actually run any commands")
   .option("-s, --safe", "don't remove any packages, just install them")
   .option("-f, --files-only", "Only install files, don't bother with packages")
+  .option("-h, --help", "See help for this command")
   .action(async (options) => {
+    if (options.help) {
+      syncCommand.help();
+      return;
+    }
+
     const rootDir = getRootDir();
     const dryRun = options.dryRun ?? false;
     const noRemove = options.safe ?? false;
@@ -34,6 +40,14 @@ cli.command("sync")
     const modules = await loadModules(rootDir, dryRun);
     const providers = await loadProviders(rootDir, dryRun);
     const store = await loadVariables(rootDir);
+
+    for (const p of providers) {
+      try {
+        if (p.checkInstallation) { p.checkInstallation(); }
+      } catch (e) {
+        errorOut(`${p.name} failed when checking its own installation: ${(e as Error).message}`); 
+      }
+    }
 
     const lockfilePath = path.join(rootDir, "sysdef-lock.json");
     const lockfile = new Lockfile();
@@ -75,6 +89,15 @@ cli.command("providers")
   .action(async () => {
     const rootDir = getRootDir();
     const providers = await loadProviders(rootDir, true);
+
+    for (const p of providers) {
+      try {
+        if (p.checkInstallation) { p.checkInstallation(); }
+        console.log(`${p.name} is installed correctly`);
+      } catch (e) {
+        console.log(`${p.name} failed when checking its own installation: ${(e as Error).message}`); 
+      }
+    }
 
   })
 
