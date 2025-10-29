@@ -1,4 +1,4 @@
-import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "@src/sysdef";
+import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 
 // yay provider - installs packages from AUR and official repos globally
 

@@ -2,6 +2,10 @@
 
 cd "$(dirname "$0")/.." || exit
 
+cd ./example-workspace || exit
+
+ln -s ../package/src ./sysdef-src
+
 rm -rf ./example-workspace/sysdef-src
 rm -rf ./example-workspace/providers
 

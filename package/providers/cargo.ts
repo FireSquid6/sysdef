@@ -1,4 +1,4 @@
-import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "@src/sysdef";
+import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 
 // cargo provider - installs Rust packages globally
 

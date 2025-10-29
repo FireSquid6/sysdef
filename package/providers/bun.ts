@@ -1,8 +1,8 @@
-import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "@src/sysdef";
+import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 import os from "os";
 import fs from "fs";
 import path from "path";
-import { v } from "@src/validation";
+import { v } from "../sysdef-src/validation";
 
 // bun povider - installs packages globally
 

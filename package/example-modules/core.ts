@@ -1,21 +1,20 @@
-import type { ModuleGenerator } from "@src/sysdef";
+import type { ModuleGenerator } from "../sysdef-src/sysdef";
 
 
 
 const m: ModuleGenerator = () => {
   return {
     name: "core",
-    variables: {},
     packages: {
+      // we can define the packages per provider in this
       "bun": [
-        "marksman",
         "@tailwindcss/cli",
-        "typescript",
+        ""
       ],
-    },
-    files: {},
-    directories: {},
+    }
   }
+
 }
+
 
 export default m;

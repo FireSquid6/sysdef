@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { type PackageInfo, } from "../src/sysdef";
-import { PackageSet } from "../src/package-set";
+import { type PackageInfo, } from "../sysdef-src/sysdef";
+import { PackageSet } from "../sysdef-src/package-set";
 
 
 describe("PackageSet", () => {

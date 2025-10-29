@@ -115,9 +115,10 @@ export const defaultShell: Shell = async (s, noThrow) => {
 
 
   let output = "";
+  const decoder = new TextDecoder("utf-8");
   for await (const chunk of p.stdout) {
-    process.stdout.write(chunk);
-    output += chunk;
+    const decoded = decoder.decode(chunk);
+    output += decoded
   }
 
   const code = await p.exited;
@@ -188,23 +189,26 @@ export function getPackageList(modules: Module[], lockfile: Lockfile): PackageIn
 
       const packageInfos: PackageInfo[] = packages.map(p => {
         const split = p.split(":");
-        switch (split.length) {
-          case 1:
-            const name = split[0]!;
-            const version = lockfile.getVersion(provider, name) ?? ANY_VERSION_STRING;
-            return {
-              name,
-              version,
-              provider,
-            }
-          case 2:
-            return {
-              name: split[0]!,
-              provider: provider,
-              version: split[1]!,
-            }
-          default:
-            errorOut(`Improper package name: ${p}`);
+
+        if (split.length === 1) {
+          const name = split[0]!;
+          const version = lockfile.getVersion(provider, name) ?? ANY_VERSION_STRING;
+          return {
+            name,
+            version,
+            provider,
+          }
+        } else {
+          const name = split[0]!;
+          split.shift();
+          const version = split.join(":");
+
+          return {
+            name,
+            version,
+            provider,
+
+          }
         }
       });
 

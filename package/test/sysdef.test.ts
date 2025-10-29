@@ -8,11 +8,10 @@ import {
   syncPackages,
   updateLockfile,
   syncFiles,
-  syncModules,
   ANY_VERSION_STRING
-} from "../src/sysdef";
-import { Lockfile } from "../src/lockfile";
-import type { Filesystem } from "../src/connections";
+} from "../sysdef-src/sysdef";
+import { Lockfile } from "../sysdef-src/lockfile";
+import type { Filesystem } from "../sysdef-src/connections";
 
 describe("VariableStore", () => {
   describe("fillIn", () => {
@@ -309,7 +308,7 @@ describe("syncPackages", () => {
       ]]
     ]);
 
-    await syncPackages(requestedPackages, [mockProvider]);
+    await syncPackages(requestedPackages, [mockProvider], false);
 
     expect(toInstallPackages).toHaveLength(1);
     expect(toInstallPackages[0]!.name).toBe("package1");
@@ -337,7 +336,7 @@ describe("syncPackages", () => {
 
     const requestedPackages = new Map([["npm", []]]);
 
-    await syncPackages(requestedPackages, [mockProvider]);
+    await syncPackages(requestedPackages, [mockProvider], false);
 
     expect(toInstallPackages).toHaveLength(0);
     expect(toUninstallPackages).toHaveLength(1);
@@ -369,7 +368,7 @@ describe("syncPackages", () => {
       ]]
     ]);
 
-    await syncPackages(requestedPackages, [mockProvider]);
+    await syncPackages(requestedPackages, [mockProvider], false);
 
     expect(toInstallPackages).toHaveLength(0);
     expect(toUninstallPackages).toHaveLength(0);
@@ -440,54 +439,6 @@ describe("syncFiles", () => {
     expect(fileCalls).toHaveLength(1);
     expect(fileCalls[0]!.path).toBe("/home/user/.profile");
     expect(fileCalls[0]!.content).toBe("export VAR=test");
-  });
-});
-
-describe("syncModules", () => {
-  test("should coordinate all sync operations", async () => {
-    let filesSynced = false;
-    let packagesSynced = false;
-
-    const mockFilesystem: Filesystem = {
-      ensureSymlink: () => { filesSynced = true; },
-      writeFile: () => {},
-      exists: () => true
-    };
-
-    const mockProvider: Provider = {
-      name: "npm",
-      install: async () => { packagesSynced = true; },
-      uninstall: async () => {},
-      getInstalled: async () => [],
-      update: async () => {}
-    };
-
-    const mockLockfile = new Lockfile();
-
-    const store = new VariableStore();
-    
-    const modules: Module[] = [
-      {
-        name: "test-module",
-        variables: {},
-        packages: {},
-        directories: {},
-        files: {
-          "/tmp/test": "test-file"
-        }
-      }
-    ];
-
-    await syncModules({
-      modules,
-      providers: [mockProvider],
-      lockfile: mockLockfile,
-      store,
-      filesystem: mockFilesystem
-    });
-
-    expect(filesSynced).toBe(true);
-    expect(packagesSynced).toBe(true);
   });
 });
 
