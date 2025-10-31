@@ -17,6 +17,8 @@ const m: ModuleGenerator = () => {
       // we can define the packages per provider in this
       "bun": [
         "@tailwindcss/cli",
+        // the colon indicates a specific version. This will
+        // force typescript version 5.9.3
         "typescript:5.9.3",
       ],
     }
