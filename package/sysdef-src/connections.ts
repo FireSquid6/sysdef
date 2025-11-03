@@ -53,7 +53,18 @@ export const normalFilesystem: Filesystem = {
       }
     }
 
-    fs.symlinkSync(destination, source);
+    fs.symlinkSync(source, destination);
+  },
+  async copy(source, destination) {
+    const dirname = path.dirname(destination);
+    fs.mkdirSync(dirname, { recursive: true });
+
+    // Remove existing file if it exists
+    if (fs.existsSync(destination)) {
+      fs.rmSync(destination);
+    }
+
+    fs.copyFileSync(source, destination);
   },
 }
 
@@ -103,5 +114,21 @@ export const confirmationFilesystem: Filesystem = {
     }
 
     fs.symlinkSync(source, destination);
+  },
+  async copy(source, destination) {
+    const dirname = path.dirname(destination);
+    fs.mkdirSync(dirname, { recursive: true });
+
+    // Check if destination exists and ask for confirmation before removing
+    if (fs.existsSync(destination)) {
+      const confirmed = await askForConfirmation(`File ${destination} already exists. Delete it to copy new content?`);
+      if (!confirmed) {
+        console.log("Copy operation cancelled.");
+        return;
+      }
+      fs.rmSync(destination);
+    }
+
+    fs.copyFileSync(source, destination);
   },
 }
