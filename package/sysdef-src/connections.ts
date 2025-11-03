@@ -42,8 +42,10 @@ export const normalFilesystem: Filesystem = {
   },
   async ensureSymlink(destination, source) {
     // Remove existing file or symlink if it exists
-    if (fs.existsSync(destination)) {
-      const stats = fs.statSync(destination);
+    console.log(`Creating symlink ${source} -> ${destination}`);
+    try {
+      const stats = fs.lstatSync(destination);
+      console.log("The file does exist");
       if (stats.isFile()) {
         fs.rmSync(destination);
       } else if (stats.isSymbolicLink()) {
@@ -51,6 +53,9 @@ export const normalFilesystem: Filesystem = {
       } else {
         errorOut(`Neither file nor link present in ${destination}. Something is probably not right so we are just stopping`);
       }
+    } catch (error) {
+      // File doesn't exist, which is fine
+      console.log("The file does not exist");
     }
 
     fs.symlinkSync(source, destination);
@@ -104,13 +109,22 @@ export const confirmationFilesystem: Filesystem = {
   },
   async ensureSymlink(destination, source) {
     // Check if destination exists and ask for confirmation before removing
-    if (fs.existsSync(destination)) {
+    try {
+      const stats = fs.lstatSync(destination);
       const confirmed = await askForConfirmation(`File or symlink ${destination} already exists. Delete it to create new symlink?`);
       if (!confirmed) {
         console.log("Symlink operation cancelled.");
         return;
       }
-      fs.unlinkSync(destination);
+      if (stats.isFile()) {
+        fs.rmSync(destination);
+      } else if (stats.isSymbolicLink()) {
+        fs.unlinkSync(destination);
+      } else {
+        fs.rmSync(destination);
+      }
+    } catch (error) {
+      // File doesn't exist, which is fine
     }
 
     fs.symlinkSync(source, destination);
