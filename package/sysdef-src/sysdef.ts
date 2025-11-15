@@ -2,11 +2,22 @@ import path from "path";
 import type { Filesystem } from "./connections";
 import type { Lockfile } from "./lockfile";
 import { PackageSet } from "./package-set";
+import { request } from "http";
 
+// panic function -- we use this a lot. Better to crash and burn then to
+// fail silently
 export function errorOut(error: string): never {
   console.log(`Fatal error: ${error}`);
   process.exit(1);
+}
 
+
+export function getErrorMessage(e: unknown): string {
+  return e instanceof Error 
+    ? e.message 
+    : typeof e === "string"
+    ? e
+    : `${e}`;
 }
 
 // used to store and fill in variables
@@ -274,7 +285,8 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
     }
 
     console.log(`  MANAGING PACKGES FOR: ${provider.name}`);
-    for (const p of alreadyInstalledInfos) {
+    // TODO - only log this on verbose mode
+    for (const p of noChange) {
       console.log(`    OK: ${p.name}:${p.version}`);
     }
     for (const p of toInstall) {
@@ -285,6 +297,7 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
         console.log(`    REMOVING: ${p.name}:${p.version}`);
       }
     }
+    // TOOD - prompt for OK
 
     await provider.install(toInstall);
     if (!noRemove) {
@@ -303,14 +316,14 @@ export async function updateLockfile(providers: Provider[], lockfile: Lockfile) 
 }
 
 
-export async  function syncFiles(modules: Module[], baseStore: VariableStore, fs: Filesystem) {
+export async  function syncFiles(modules: Module[], baseStore: VariableStore, fs: Filesystem, rootDir: string) {
   for (const mod of modules) {
     const store = baseStore.branchOff(mod.variables);
 
     for (const [fp, file] of Object.entries(mod.files)) {
       const destinationFilepath = store.fillIn(fp)
       if (typeof file === "string") {
-        const s = path.resolve(path.join("./dotfiles", file));
+        const s = path.resolve(path.join(rootDir, file));
         const sourceFilepath = store.fillIn(s);
         await fs.ensureSymlink(destinationFilepath, sourceFilepath);
         console.log(`Linked file: ${sourceFilepath} -> ${destinationFilepath}`);

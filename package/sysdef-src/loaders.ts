@@ -4,10 +4,11 @@ import fs from "fs";
 
 const validExtensions = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
-export async function loadModules(rootDir: string, dryRun: boolean): Promise<Module[]> {
+export async function loadModules(rootDir: string, dryRun: boolean, modulesList: string[]): Promise<Module[]> {
   const modules: Module[] = [];
   const modulesDirectory = path.join(rootDir, "modules");
   console.log(`\nLOADING MODULES FROM ${modulesDirectory}`);
+  const toLoad = new Set(modulesList);
 
   if (!fs.existsSync(modulesDirectory)) {
     errorOut(`No modules directory in ${rootDir}`);
@@ -18,17 +19,22 @@ export async function loadModules(rootDir: string, dryRun: boolean): Promise<Mod
   for (const fp of fs.readdirSync(modulesDirectory)) {
     const filepath = path.join(modulesDirectory, fp);
     const extension = path.extname(filepath);
+    const basename = path.basename(filepath).split(".")[0]!;
     if (!validExtensions.has(extension)) {
       console.log(`Skipping ${fp}, not a valid extension`);
       continue;
     }
+    if (!toLoad.has(basename)) {
+      console.log(`Skipping ${basename}, not loaded in config`);
+      continue;
+    }
 
-    console.log(`Loading ${fp}`);
     try {
       const mod = await import(filepath); 
 
       const generator: ModuleGenerator = mod.default as ModuleGenerator;
       const m = generator(shell);
+
       modules.push(m);
     } catch (e) {
       console.log(`Error loading ${fp}:`);
@@ -41,10 +47,11 @@ export async function loadModules(rootDir: string, dryRun: boolean): Promise<Mod
 
 }
 
-export async function loadProviders(rootDir: string, dryRun: boolean): Promise<Provider[]> {
+export async function loadProviders(rootDir: string, dryRun: boolean, providersList: string[]): Promise<Provider[]> {
   const providers: Provider[] = [];
   const providersDirectory = path.join(rootDir, "providers");
   console.log(`\nLOADING PROVIDERS FROM ${providersDirectory}`);
+  const toLoad = new Set(providersList);
 
   const shell = dryRun ? dryShell : defaultShell;
 
@@ -55,16 +62,23 @@ export async function loadProviders(rootDir: string, dryRun: boolean): Promise<P
   for (const fp of fs.readdirSync(providersDirectory)) {
     const filepath = path.join(providersDirectory, fp);
     const extension = path.extname(filepath);
+    const basename = path.basename(filepath).split(".")[0]!;
     if (!validExtensions.has(extension)) {
+      console.log(`Skipping ${fp}, not a valid extension`);
+      continue;
+    }
+    if (!toLoad.has(basename)) {
+      console.log(`Skipping ${basename}, not loaded in config`);
       continue;
     }
 
-    console.log(`Loading ${fp}`);
     try {
       const mod = await import(filepath); 
 
       const generator: ProviderGenerator = mod.default as ProviderGenerator;
       const provider = generator(shell);
+
+      console.log(`Loaded ${fp}`);
       providers.push(provider);
     } catch (e) {
       console.log(`Error loading ${fp}:`);
