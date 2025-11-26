@@ -1,8 +1,8 @@
 import { defaultShell, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 import { partitionArray, stringifyPackageParition } from "../sysdef-src/prompt";
 
-// yay provider - installs packages from AUR and official repos globally
-const MAX_AT_ONCE = 5;
+// apt provider - installs packages from official Ubuntu/Debian repos globally
+const MAX_AT_ONCE = 10;
 
 // we use the default shell when getting the list of all installed packages since
 // we want that to happen even in a dry run
@@ -10,13 +10,11 @@ const realShell = defaultShell
 
 const provider: ProviderGenerator = (run: Shell) => {
   return {
-    name: "yay",
+    name: "apt",
     async checkInstallation() {
-      const result = await run(`which yay`, {
-        throwOnError: true
-      });
+      const result = await run(`which apt`, { throwOnError: true });
       if (result.code !== 0) {
-        throw new Error("yay is not installed or not in PATH");
+        throw new Error("apt is not installed or not in PATH");
       }
     },
     async install(packages: PackageInfo[]) {
@@ -25,9 +23,9 @@ const provider: ProviderGenerator = (run: Shell) => {
       for (const part of partitions) {
         const string = stringifyPackageParition(part);
         console.log(`Installing ${string}`);
-        const result = await run(`yay -S --noconfirm ${string}`, {});
+        const result = await run(`sudo apt install -y ${string}`, { throwOnError: true });
         if (result.code !== 0) {
-          console.log(`Erorr installing packages: ${part}. See the logs below`);
+          console.log(`Error installing packages: ${part}. See the logs below`);
           console.log(result.stdout);
         }
       }
@@ -39,46 +37,34 @@ const provider: ProviderGenerator = (run: Shell) => {
       for (const part of partitions) {
         const string = part.join(" ");
         console.log(`Uninstalling ${string}`);
-        const result = await run(`yay -Rs --noconfirm ${string}`, {});
-
-        if (result.code !== 0) {
-          console.log(`Erorr uninstalling packages: ${part}. See the logs below`);
-          console.log(result.stdout);
-        }
+        await run(`sudo apt remove -y ${string}`, { throwOnError: true });
       }
     },
 
     async getInstalled() {
-      const result = await realShell(`yay -Qe`, {});
-      const lines = result.stdout.trim().split('\n').filter(line => line.trim());
+      const result = await realShell(`apt list --installed`, { throwOnError: true });
+      const lines = result.stdout.trim().split('\n').filter(line => line.trim() && !line.startsWith('Listing...'));
       
       return lines.map(line => {
-        const match = line.match(/^(\S+)\s+(.+)$/);
+        const match = line.match(/^(\S+)\/\S+\s+(\S+)\s+/);
         if (!match || !match[1] || !match[2]) {
-          throw new Error(`Failed to parse yay package line: ${line}`);
+          throw new Error(`Failed to parse apt package line: ${line}`);
         }
 
         
         return {
           name: match[1],
-          provider: "yay",
+          provider: "apt",
           version: match[2],
         };
       });
     },
 
     async update(packages: string[]) {
-      const partitions = partitionArray(packages, MAX_AT_ONCE);
-
-      for (const part of partitions) {
-        const string = part.join(" ");
-        console.log(`Uninstalling ${string}`);
-        const result = await run(`yay -Syu --noconfirm ${string}`, {});
-
-        if (result.code !== 0) {
-          console.log(`Erorr updating packages: ${part}. See the logs below`);
-          console.log(result.stdout);
-        }
+      if (packages.length === 0) {
+        await run(`sudo apt update && sudo apt upgrade -y`, { throwOnError: true });
+      } else {
+        await Promise.all(packages.map(p => run(`sudo apt install -y ${p}`, { throwOnError: true })));
       }
     },
   };
