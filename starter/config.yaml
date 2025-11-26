@@ -1,0 +1,9 @@
+# put all the providers to laod here
+providers:
+  - yay
+# all modules can go here
+modules:
+  - example
+# these variables cascade--if any are redefined elsewhere, the deepest
+# variation is used 
+variables:
