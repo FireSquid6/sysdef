@@ -42,6 +42,7 @@ const syncCommand = cli.command("sync")
     const modules = await loadModules(rootDir, dryRun, config.modules);
     const providers = await loadProviders(rootDir, dryRun, config.providers);
     const store = await loadVariables(rootDir);
+    store.insertAll(config.variables);
 
     for (const p of providers) {
       try {

@@ -5,25 +5,27 @@ sidebar:
     order: 250
 ---
 
+import { FileTree } from '@astrojs/starlight/components';
+
 The sysdef CLI is built using [Commander.js](https://github.com/tj/commander.js) and provides a simple interface for managing your system configuration. The main entry point is through the `sysdef` command located in your `bin/` directory.
 
 ## Root Directory
 
 Sysdef uses a root directory (defaults to `$HOME/sysdef` or can be set via `SYSDEF_ROOT_DIR` environment variable) that contains:
 
-```
-bin/
-    bun
-    sysdef
-sysdef-src/
-    *.ts (source files)
-modules/
-    *.ts (module definitions)
-providers/
-    *.ts (provider definitions)
-config.yaml
-sysdef-lock.json (auto-generated)
-```
+<FileTree>
+- bin/
+  - bun
+  - sysdef
+- sysdef-src/
+  - *.ts (source files)
+- modules/
+  - *.ts (module definitions)
+- providers/
+  - *.ts (provider definitions)
+- config.yaml
+- sysdef-lock.json (auto-generated)
+</FileTree>
 
 ## Available Commands
 

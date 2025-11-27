@@ -5,23 +5,23 @@ sidebar:
     order: 100 
 ---
 
+import { FileTree } from '@astrojs/starlight/components';
+
 Sysdef is a hackable system declaration manager written and configured in [Typescript](https://www.typescriptlang.org/) with [Bun](https://oven.sh). It works by using a directory (typically stored in a git repository) somewhere on your machine like `~/sysdef`. The directory will contain a file structure looking something like:
 
-
-```
-bin/
-    bun
-    sysdef
-sysdef-src/
-    *.ts (source files)
-modules/
-    core.ts
-    desktop.ts
-    ... (other modules you can make)
-providers/
-    
-config.yaml
-```
+<FileTree>
+- bin/
+  - bun
+  - sysdef
+- sysdef-src/
+  - *.ts (source files)
+- modules/
+  - core.ts
+  - desktop.ts
+  - ... (other modules you can make)
+- providers/
+- config.yaml
+</FileTree>
 
 
 Each [Module](/guides/modules) is a set of directories, files, and packages you want installed, created, and managed on your machine. You also have [Providers](/guides/providers) which provide an interface for interacting with a package manager. Some default providers for the package managers `yay`, `apt`, and `bun` are included. It's expected that you have those installed already.
