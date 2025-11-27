@@ -18,23 +18,19 @@ hero:
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+# Features
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="Hackable" icon="pencil">
+    A sysdef installation includes its own source code. Want to add your own feature or minor tweak? Just open the source code and make your change.
 	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
+	<Card title="Programmatically Configured" icon="setting">
+    Sysdef is configured in typescript. This means you don't have to learn some esoteric DSL and aren't restricted to just a schema like YAML.
 	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
+	<Card title="Platform Agnostic" icon="rocket">
+    Sysdef can run using any package manager with its system of providers. You could even use the same configuration across multiple distros or operating systems.
 	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
+	<Card title="Open Source" icon="star">
+    Sysdef is FOSS. If you have modifications that you would like to share with everyone, go ahead and make a PR!
 	</Card>
 </CardGrid>
