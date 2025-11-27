@@ -1,0 +1,126 @@
+---
+title: CLI
+description: Use and manage the CLI
+sidebar:
+    order: 250
+---
+
+The sysdef CLI is built using [Commander.js](https://github.com/tj/commander.js) and provides a simple interface for managing your system configuration. The main entry point is through the `sysdef` command located in your `bin/` directory.
+
+## Root Directory
+
+Sysdef uses a root directory (defaults to `$HOME/sysdef` or can be set via `SYSDEF_ROOT_DIR` environment variable) that contains:
+
+```
+bin/
+    bun
+    sysdef
+sysdef-src/
+    *.ts (source files)
+modules/
+    *.ts (module definitions)
+providers/
+    *.ts (provider definitions)
+config.yaml
+sysdef-lock.json (auto-generated)
+```
+
+## Available Commands
+
+### `sysdef`
+
+Running `sysdef` without arguments displays help information for all available commands.
+
+### `sysdef sync`
+
+The primary command for synchronizing your system configuration. This command:
+
+1. **Syncs files**: Creates symlinks and generates files from your modules
+2. **Manages packages**: Installs/removes packages through configured providers
+3. **Runs events**: Executes any `onEverySync` functions in your modules
+4. **Updates lockfile**: Records exact package versions for reproducibility
+
+**Options:**
+- `-d, --dry-run`: Preview changes without executing them
+- `-s, --safe`: Install packages but don't remove any (safer for testing)
+- `-f, --files-only`: Only sync files, skip package management
+- `-h, --help`: Show help for this command
+
+**Examples:**
+```bash
+# Normal sync
+sysdef sync
+
+# Preview what would happen
+sysdef sync --dry-run
+
+# Only sync files, don't touch packages
+sysdef sync --files-only
+
+# Sync but don't remove any packages
+sysdef sync --safe
+```
+
+### `sysdef providers`
+
+Lists all configured providers and checks their installation status. Each provider can define a `checkInstallation()` function to verify it's working correctly.
+
+**Example output:**
+```
+yay is installed correctly
+apt is installed correctly
+bun failed when checking its own installation: command not found
+```
+
+### `sysdef list-installed [provider]`
+
+Shows all packages currently installed through sysdef providers.
+
+**Arguments:**
+- `provider` (optional): Filter by specific provider name
+
+**Examples:**
+```bash
+# List packages from all providers
+sysdef list-installed
+
+# List only packages from yay provider
+sysdef list-installed yay
+```
+
+**Example output:**
+```
+Currently installed packages for yay:
+  firefox@latest
+  git@2.42.0
+  neovim@0.9.4
+
+Currently installed packages for bun:
+  typescript@5.2.2
+  @types/node@20.8.0
+```
+
+### `sysdef hello`
+
+A simple test command that prints "Hello, world!" - useful for verifying the CLI is working.
+
+## Error Handling
+
+The CLI uses the `errorOut()` function from `sysdef.ts:9` for fatal errors, which prints an error message and exits with code 1. Common error scenarios:
+
+- Missing configuration file
+- Invalid module or provider files
+- Provider installation check failures
+- Package version conflicts between modules
+
+## Configuration Loading
+
+The CLI loads configuration from:
+
+1. **config.yaml**: Main configuration specifying which modules and providers to load
+2. **Module files**: TypeScript files in the `modules/` directory
+3. **Provider files**: TypeScript files in the `providers/` directory  
+4. **Variables file**: Optional `variables.{ts,js,tsx,jsx}` for global variables
+5. **Lockfile**: `sysdef-lock.json` for tracking exact package versions
+
+All TypeScript/JavaScript files are dynamically imported and must export a default function that returns the appropriate object (Module, Provider, or variables record).

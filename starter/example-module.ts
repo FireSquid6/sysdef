@@ -18,7 +18,8 @@ const m: ModuleGenerator = () => {
         return `The home directory is: ${variables.get("HOMEDIR")}`
       },
     },
-    // if you'd like to link an entire directory, do so below
+    // if you'd like to link an entire directory, do so below. You can
+    // also reference variables in the directory section
     directories: {},
     packages: {
       // we can define the packages per provider in this

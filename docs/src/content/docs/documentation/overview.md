@@ -1,0 +1,73 @@
+---
+title: Overview
+description: An introduction and explanation of what sysdef is
+sidebar:
+    order: 100 
+---
+
+Sysdef is a hackable system declaration manager written and configured in [Typescript](https://www.typescriptlang.org/) with [Bun](https://oven.sh). It works by using a directory (typically stored in a git repository) somewhere on your machine like `~/sysdef`. The directory will contain a file structure looking something like:
+
+
+```
+bin/
+    bun
+    sysdef
+sysdef-src/
+    *.ts (source files)
+modules/
+    core.ts
+    desktop.ts
+    ... (other modules you can make)
+providers/
+    
+config.yaml
+```
+
+
+Each [Module](/guides/modules) is a set of directories, files, and packages you want installed, created, and managed on your machine. You also have [Providers](/guides/providers) which provide an interface for interacting with a package manager. Some default providers for the package managers `yay`, `apt`, and `bun` are included. It's expected that you have those installed already.
+
+The source code for sysdef is stored locally and is very small (~1500 LOC). It's copied directly into `sysdef-src` and built to be simple and hackable. In the `bin` directory is a local installation of bun (an alternative of node used to run typescript code) alongside a `sysdef` executable. You should probably add that `bin` directory to your path. 
+
+
+Nothing in the docs will dive too deep into how sysdef works--that can be read from the source code
+
+
+
+# Config File
+The `config.yaml` file contains two lists: the list of all modules, and the list of all providers. You could put the `config.yaml` in your gitignore so that a different one is created for each machine. It also has a list of variables commonly used for the home directory or username.
+
+```yaml
+providers:
+  - yay
+# all modules can go here
+modules:
+  - example
+# these variables cascade--if any are redefined elsewhere, the deepest
+# variation is used 
+variables:
+  - HOMEDIR: /home/firesquid
+```
+
+# Variables
+Variables can be used in the definition of file paths and file contents. For example, when defining files a variable `HOMEDIR` can be referenced with:
+
+```ts
+// ...
+  return {
+    files: {
+      // you can defined files that link to something locally:
+      "{HOMEDIR}/example-config-file.txt": "./dotfiles/sysdef-example-dotfile.txt",
+      
+      // alternatively, a string returning function can be used to generate the
+      // contents of the file
+      //
+      // this can use variables as well--useful for per machine differences
+      "{HOMEDIR}/": (variables) => {
+        return `The home directory is: ${variables.get("HOMEDIR")}`
+      },
+    },
+  }
+```
+
+Variables can be defined at the module level inside its `variables` section or in the `config.yaml` file. In the case of a conflict, **the "closer" field will take priority**. Think of the variables "branching off" at each module--variables defined in the config are accessible in all modules, but variables defined in `module1` are not accessible in `module2`, and a variable defined in `module1` with the same name as one defined in the config will overwrite it.
+
