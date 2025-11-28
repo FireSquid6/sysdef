@@ -1,23 +1,20 @@
 ---
 title: Sysdef 
 description: Sysdef is a hackable and declarative system configuration tool
-template: splash # Remove or comment out this line to display the site sidebar on this page.
-hero:
-  tagline: Start using sysdef and keep all of your machines in sync and organized
-  image:
-    file: ../../assets/houston.webp
-  actions:
-    - text: Get Started
-      link: /documentation/overview/
-      icon: right-arrow
-    - text: Install Now
-      link: /documentation/installation
-      icon: download
-      variant: minimal
+tableOfContents: false
 ---
 
 import { Card, CardGrid, Code } from '@astrojs/starlight/components';
 
+```text
+  ___  _   _  ___  ___   ___  ___
+ / __|| | | |/ __||   \ | __|| __|
+ \__ \| |_| |\__ \| |) || _| | _|
+ |___/ \__, ||___/|___/ |___||_|
+       |___/
+       ⟳ keep systems in sync
+```
+Sysdef is a hackable system configuration tool built in [Typescript](https://www.typescriptlang.org/) with [Bun](https://bun.sh). It allows you to define files, directories, and packages for your system to be installed and managed declaratively. If you've ever wanted the benefits of something like NixOS without being trapped in its ecosystem, sysdef is for you. 
 
 ```bash
 curl -sL https://raw.githubusercontent.com/FireSquid6/sysdef/refs/heads/main/scripts/clone-and-initialize.sh | bash
