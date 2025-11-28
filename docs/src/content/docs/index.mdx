@@ -3,7 +3,7 @@ title: Sysdef
 description: Sysdef is a hackable and declarative system configuration tool
 template: splash # Remove or comment out this line to display the site sidebar on this page.
 hero:
-  tagline: Start using sysdef and keep all of your systems in sync
+  tagline: Start using sysdef and keep all of your machines in sync and organized
   image:
     file: ../../assets/houston.webp
   actions:
@@ -16,7 +16,12 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Code } from '@astrojs/starlight/components';
+
+
+```bash
+curl -sL https://raw.githubusercontent.com/FireSquid6/sysdef/refs/heads/main/scripts/clone-and-initialize.sh | bash
+```
 
 # Features
 

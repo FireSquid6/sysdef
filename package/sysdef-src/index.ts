@@ -42,7 +42,6 @@ const syncCommand = cli.command("sync")
     const modules = await loadModules(rootDir, dryRun, config.modules);
     const providers = await loadProviders(rootDir, dryRun, config.providers);
     const store = await loadVariables(rootDir);
-    store.insertAll(config.variables);
 
     for (const p of providers) {
       try {
@@ -82,6 +81,21 @@ const syncCommand = cli.command("sync")
 
     console.log("\nRUNNING EVENTS:");
     await runEvents(modules);
+
+    await updateLockfile(providers, lockfile);
+    lockfile.serializeToFile(lockfilePath);
+  });
+
+cli.command("update-lockfile")
+  .description("Update the lockfile to the current system state")
+  .action(async () => {
+    const rootDir = getRootDir();
+    const config = readConfig(rootDir);
+    const providers = await loadProviders(rootDir, false, config.providers);
+    const lockfile = new Lockfile();
+    const lockfilePath = path.join(rootDir, "sysdef-lock.json");
+
+    lockfile.readFromFile(lockfilePath);
 
     await updateLockfile(providers, lockfile);
     lockfile.serializeToFile(lockfilePath);
