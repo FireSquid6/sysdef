@@ -1,17 +1,29 @@
-# sysdef
+# [sysdef](https://sysdef.vercel.app/)
+
+```text
+  ___  _   _  ___  ___   ___  ___
+ / __|| | | |/ __||   \ | __|| __|
+ \__ \| |_| |\__ \| |) || _| | _|
+ |___/ \__, ||___/|___/ |___||_|
+       |___/
+       ⟳ keep systems in sync
+```
+
 A declarative experience for any package manager.
+
+Sysdef is currently very experimental. Make backups before you use it. Not my fault if you brick your system[^1].
 
 # Installation
 Sysdef does not work like standard programs--it's meant to be as hackable as possible. The typescript codebase is installed directly onto your machine with a [bun](https://bun.sh) installation next to it. You can run:
 
 ```bash
-# TODO
+curl -sL https://raw.githubusercontent.com/FireSquid6/sysdef/refs/heads/main/scripts/clone-and-initialize.sh | bash
 ```
 
-This will get you a basic installation in `~/sysdef`. The `bin` directory will contain the `sysdef` executable and an installation of `bun`. You can see a couple of useful bash scripts for managing your installation (updating bun, updating the source, etc.) in `scripts`. A git repo is also initialized, meaning its easy to sync your config across multiple machines.
+This will get you a basic installation in `~/sysdef`. The `bin` directory will contain the `sysdef` executable and an installation of `bun`. 
 
 # Usage
-Sysdef is programmatically configured in typescript files. This means that you can actually get editor autocomplete for it using the typescript language server for neovim, vscode, or whatever you use.
+You can learn more by visiting the [sysdef docs](https://sysdef.vercel.app).
 
 # Repo
 The repo contains the following directories:
@@ -19,6 +31,14 @@ The repo contains the following directories:
 - `example-workspace` - an example workspace to toy around with for development
 - `providers` - the providers directory for every provider. If you make your own provider, put it here!
 
-# TODO
-- [ ] system for generating a config based on your current system information
+# To Do
+- [ ] custom packages
+- [ ] events
+- [ ] auto config generator
+- [ ] e2e test suite with docker
+- [ ] split yay into using pacman + aur integration
+- [x] docs
+- [ ] make the base script execute with sudo
 
+
+[^1]: Broken systems while developing counter: 2
