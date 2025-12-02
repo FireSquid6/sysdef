@@ -36,9 +36,11 @@ The repo contains the following directories:
 - [ ] events
 - [ ] auto config generator
 - [ ] e2e test suite with docker
-- [ ] split yay into using pacman + aur integration
+- [ ] use pacman instead of yay
+- [ ] custom aur provider 
 - [x] docs
-- [ ] make the base script execute with sudo
+- [ ] pull and update providers with a command
+- [ ] self update command
 
 
 [^1]: Broken systems while developing counter: 2
