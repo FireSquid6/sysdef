@@ -88,14 +88,14 @@ export class SysdefContainer {
     }
     this.id = res.stdout.trim();
 
+    // Copy the install into place. Drop the unit tests and the e2e harness
+    // sources, but keep test-e2e/image-files (the driver runs from there).
     const setup = this.exec(
-      "cp -r /src /sysdef && rm -rf /sysdef/test /sysdef/test-e2e && mkdir -p /sysdef/modules /sysdef/dotfiles",
+      "cp -r /src /sysdef && rm -rf /sysdef/test && find /sysdef/test-e2e -maxdepth 1 -type f -delete && mkdir -p /sysdef/modules /sysdef/dotfiles",
     );
     if (setup.code !== 0) {
       throw new Error(`Failed to lay down /sysdef: ${setup.stderr || setup.stdout}`);
     }
-
-    this.writeFile("/sysdef/e2e-driver.ts", DRIVER_TS);
   }
 
   private containerName(): string {
@@ -147,7 +147,7 @@ export class SysdefContainer {
    */
   driver(provider: string, action: string, args: string[] = []): RunResult {
     return this.exec(
-      `cd /sysdef && bun run e2e-driver.ts ${provider} ${action} ${args.join(" ")}`,
+      `cd /sysdef && bun run test-e2e/image-files/e2e-driver.ts ${provider} ${action} ${args.join(" ")}`,
       { timeoutMs: 20 * 60 * 1000 },
     );
   }
@@ -187,38 +187,6 @@ export function singleModuleConfig(provider: string, moduleName: string, variabl
     .join("\n");
   return `providers:\n  - ${provider}\nmodules:\n  - ${moduleName}\nvariables:${vars ? "\n" + vars : " {}"}\n`;
 }
-
-// Runs inside the container as /sysdef/e2e-driver.ts. Loads a real provider with
-// the real defaultShell and performs one action, so tests exercise the actual
-// provider code against the actual package manager.
-const DRIVER_TS = `import { defaultShell, ANY_VERSION_STRING, type PackageInfo } from "./sysdef-src/sysdef";
-
-const providerName = process.argv[2]!;
-const action = process.argv[3]!;
-const rest = process.argv.slice(4);
-
-const gen = (await import(\`./providers/\${providerName}.ts\`)).default;
-const provider = gen(defaultShell);
-
-function toPackageInfo(spec: string): PackageInfo {
-  const i = spec.indexOf(":");
-  if (i < 0) return { name: spec, version: ANY_VERSION_STRING, provider: providerName };
-  return { name: spec.slice(0, i), version: spec.slice(i + 1), provider: providerName };
-}
-
-if (action === "install") {
-  await provider.install(rest.map(toPackageInfo));
-} else if (action === "uninstall") {
-  await provider.uninstall(rest);
-} else if (action === "update") {
-  await provider.update(rest);
-} else if (action === "installed") {
-  const list = await provider.getInstalled();
-  console.log("JSON:" + JSON.stringify(list));
-} else {
-  throw new Error("unknown action: " + action);
-}
-`;
 
 /** Convenience: build a module .ts that only declares packages for one provider. */
 export function packagesModule(name: string, provider: string, packages: string[]): string {

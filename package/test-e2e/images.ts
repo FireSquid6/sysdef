@@ -1,11 +1,13 @@
-// Inline Dockerfiles for the e2e environments. Each image bundles `bun` (to run
-// sysdef) plus the target package manager. A fake `sudo` that just execs its
-// args lets providers' `asRoot`/`sudo ...` paths work while running as root.
+// e2e environment images. Each bundles `bun` (to run sysdef) plus the target
+// package manager. The Dockerfiles live as real files in ./image-files and are
+// read from disk here. A fake `sudo` that just execs its args lets providers'
+// `asRoot`/`sudo ...` paths work while running as root.
 
+import fs from "fs";
+import path from "path";
 import { buildImage } from "./harness";
 
-const FAKE_SUDO = `printf '#!/bin/sh\\nexec "$@"\\n' > /usr/local/bin/sudo && chmod +x /usr/local/bin/sudo`;
-const INSTALL_BUN = `curl -fsSL https://bun.com/install | bash && ln -sf /root/.bun/bin/bun /usr/local/bin/bun`;
+const IMAGE_FILES = path.join(import.meta.dir, "image-files");
 
 export const IMAGES = {
   debian: "sysdef-e2e-debian",
@@ -15,8 +17,9 @@ export const IMAGES = {
 
 const built = new Set<string>();
 
-function ensure(tag: string, dockerfile: string): string {
+function ensure(tag: string, dockerfileName: string): string {
   if (!built.has(tag)) {
+    const dockerfile = fs.readFileSync(path.join(IMAGE_FILES, dockerfileName), "utf8");
     buildImage(tag, dockerfile);
     built.add(tag);
   }
@@ -25,40 +28,15 @@ function ensure(tag: string, dockerfile: string): string {
 
 /** Debian + apt + bun. Used for the apt and bun providers. */
 export function debianImage(): string {
-  return ensure(
-    IMAGES.debian,
-    `FROM debian:stable-slim
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates unzip git xz-utils && rm -rf /var/lib/apt/lists/*
-RUN ${FAKE_SUDO}
-RUN ${INSTALL_BUN}
-`,
-  );
+  return ensure(IMAGES.debian, "debian.Dockerfile");
 }
 
 /** Official rust image (cargo preinstalled) + bun. Used for the cargo provider. */
 export function rustImage(): string {
-  return ensure(
-    IMAGES.rust,
-    `FROM rust:slim
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      curl ca-certificates unzip git && rm -rf /var/lib/apt/lists/*
-RUN ${FAKE_SUDO}
-RUN ${INSTALL_BUN}
-`,
-  );
+  return ensure(IMAGES.rust, "rust.Dockerfile");
 }
 
 /** Arch Linux + pacman + bun. Used for arch-official (and base for aur/yay). */
 export function archImage(): string {
-  return ensure(
-    IMAGES.arch,
-    `FROM archlinux:latest
-RUN pacman -Sy --noconfirm --needed archlinux-keyring \
- && pacman -Syu --noconfirm --needed curl unzip git which sudo base-devel
-RUN ${INSTALL_BUN}
-`,
-  );
+  return ensure(IMAGES.arch, "arch.Dockerfile");
 }
