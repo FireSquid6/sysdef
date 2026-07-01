@@ -1,4 +1,4 @@
-import { defaultShell, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
+import { defaultShell, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 import { partitionArray, stringifyPackageParition } from "../sysdef-src/prompt";
 
 // yay provider - installs packages from AUR and official repos globally
@@ -27,9 +27,10 @@ const provider: ProviderGenerator = (run: Shell) => {
         console.log(`Installing ${string}`);
         const result = await run(`yay -S --noconfirm ${string}`, {
           displayOutput: true,
+          throwOnError: true,
         });
         if (result.code !== 0) {
-          console.log(`Erorr installing packages: ${part}. See the logs above`);
+          errorOut(`Failed to install yay packages: ${string} (exit code ${result.code})`);
         }
       }
     },

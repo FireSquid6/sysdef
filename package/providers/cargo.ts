@@ -1,4 +1,4 @@
-import { ANY_VERSION_STRING, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
+import { ANY_VERSION_STRING, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 
 // cargo provider - installs Rust packages globally
 
@@ -12,11 +12,14 @@ const provider: ProviderGenerator = (run: Shell) => {
       }
     },
     async install(packages: PackageInfo[]) {
-      await Promise.all(packages.map(p => {
+      await Promise.all(packages.map(async p => {
         const version = p.version === ANY_VERSION_STRING
           ? ""
           : ` --version ${p.version}`;
-        return run(`cargo install ${p.name}${version}`, {});
+        const result = await run(`cargo install ${p.name}${version}`, { throwOnError: true });
+        if (result.code !== 0) {
+          errorOut(`Failed to install cargo package: ${p.name}${version} (exit code ${result.code})`);
+        }
       }));
     },
 

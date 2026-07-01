@@ -1,4 +1,4 @@
-import { defaultShell, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
+import { defaultShell, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 import { partitionArray, stringifyPackageParition } from "../sysdef-src/prompt";
 
 // apt provider - installs packages from official Ubuntu/Debian repos globally
@@ -25,8 +25,8 @@ const provider: ProviderGenerator = (run: Shell) => {
         console.log(`Installing ${string}`);
         const result = await run(`sudo apt install -y ${string}`, { throwOnError: true });
         if (result.code !== 0) {
-          console.log(`Error installing packages: ${part}. See the logs below`);
           console.log(result.stdout);
+          errorOut(`Failed to install apt packages: ${string} (exit code ${result.code})`);
         }
       }
     },

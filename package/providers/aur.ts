@@ -1,4 +1,4 @@
-import { defaultShell, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
+import { defaultShell, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 import { partitionArray, stringifyPackageParition } from "../sysdef-src/prompt";
 
 // AUR provider - installs packages from the Arch User Repository
@@ -81,9 +81,10 @@ const provider: ProviderGenerator = (run: Shell) => {
         const result = await run(`pacman -S --noconfirm ${string}`, {
           displayOutput: true,
           asRoot: true,
+          throwOnError: true,
         });
         if (result.code !== 0) {
-          console.log(`Error installing packages: ${part}. See the logs above`);
+          errorOut(`Failed to install aur packages: ${string} (exit code ${result.code})`);
         }
       }
     },

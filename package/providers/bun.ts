@@ -30,7 +30,10 @@ const provider: ProviderGenerator = (run: Shell) => {
       const specs = packages
         .map(p => `${p.name}@${p.version === ANY_VERSION_STRING ? "latest" : p.version}`)
         .join(" ");
-      await run(`${bunBinary} install -g ${specs} -E`, {});
+      const result = await run(`${bunBinary} install -g ${specs} -E`, { throwOnError: true });
+      if (result.code !== 0) {
+        errorOut(`Failed to install bun packages: ${specs} (exit code ${result.code})`);
+      }
     },
 
     async uninstall(packages: string[]) {

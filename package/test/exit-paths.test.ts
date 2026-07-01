@@ -8,6 +8,7 @@ import path from "path";
 // them in a child bun process and assert on the exit code + output.
 
 const SRC = path.resolve(import.meta.dir, "..", "sysdef-src");
+const PROVIDERS = path.resolve(import.meta.dir, "..", "providers");
 
 let dir: string;
 beforeEach(() => {
@@ -102,5 +103,40 @@ describe("getPackageList version-conflict path", () => {
     `);
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("OK:2");
+  });
+});
+
+describe("provider install failure path", () => {
+  // Providers should fail fast (errorOut -> exit 1) with a clean message when a
+  // package can't be installed, rather than swallowing the failure or leaking a
+  // raw thrown-error stack trace. We simulate a failing package manager with a
+  // shell that always returns a non-zero exit code.
+  const failScript = (provider: string, file: string) => `
+    import gen from ${JSON.stringify(path.join(PROVIDERS, file))};
+    const failingShell = async () => ({ code: 1, stdout: "boom" });
+    const p = gen(failingShell);
+    await p.install([{ name: "does-not-exist", version: "_*_", provider: ${JSON.stringify(provider)} }]);
+    console.log("SHOULD_NOT_REACH");
+  `;
+
+  test("bun install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("bun", "bun.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
+  });
+
+  test("apt install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("apt", "apt.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
+  });
+
+  test("cargo install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("cargo", "cargo.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
   });
 });
