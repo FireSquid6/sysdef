@@ -53,12 +53,15 @@ const provider: ProviderGenerator = (run: Shell) => {
     },
 
     async getInstalled() {
-      // Get all explicitly installed packages
-      const explicitResult = await realShell(`pacman -Qe`, {});
+      // Get all explicitly installed packages.
+      // throwOnError:true here suppresses throwing on a non-zero exit -- pacman
+      // query subcommands exit 1 when their result set is empty (e.g. -Qm with
+      // no foreign packages), which is not an error for us.
+      const explicitResult = await realShell(`pacman -Qe`, { throwOnError: true });
       const explicitLines = explicitResult.stdout.trim().split('\n').filter(line => line.trim());
 
       // Get foreign/unofficial packages (from AUR, etc.)
-      const foreignResult = await realShell(`pacman -Qm`, {});
+      const foreignResult = await realShell(`pacman -Qm`, { throwOnError: true });
       const foreignLines = foreignResult.stdout.trim().split('\n').filter(line => line.trim());
 
       // Create a set of foreign package names for quick lookup

@@ -248,7 +248,7 @@ export function getPackageList(modules: Module[], lockfile: Lockfile): PackageIn
         const k = `${p.provider}:${p.name}`;
         if (seenVersions.has(k)) {
           const seen = seenVersions.get(k)!;
-          if (versionMatches(seen.version, p.version)) {
+          if (!versionMatches(seen.version, p.version)) {
             errorOut(`Requested two different versions for package ${p.name}: ${seen.version} in ${seen.module} and ${p.version} in ${mod.name}`);
           }
         } else {
@@ -275,7 +275,12 @@ function versionMatches(v1: string, v2: string) {
 
 }
 
-export async function syncPackages(allPackages: Map<string, PackageInfo[]>, providers: Provider[], noRemove: boolean) {
+export async function syncPackages(
+  allPackages: Map<string, PackageInfo[]>,
+  providers: Provider[],
+  noRemove: boolean,
+  confirm: (prompt: string) => Promise<void> = promptForOk,
+) {
   for (const provider of providers) {
     const packages = allPackages.get(provider.name) ?? [];
     const toInstall: PackageInfo[] = [];
@@ -317,7 +322,7 @@ export async function syncPackages(allPackages: Map<string, PackageInfo[]>, prov
       }
     }
     if (toInstall.length > 0 || toUninstall.length > 0) {
-      await promptForOk("The above operations will be performed. Is this ok?");
+      await confirm("The above operations will be performed. Is this ok?");
     }
 
     if (toInstall.length > 0) {

@@ -22,21 +22,26 @@ const provider: ProviderGenerator = (run: Shell) => {
         errorOut(`Bun binary not found in ${bunBinary}--you may need to edit the provider configuration, see bun.ts`)
       }
     },
-    // this should be able to handle the case where a package is requested to be intsalled of a different version! 
+    // this should be able to handle the case where a package is requested to be intsalled of a different version!
     async install(packages: PackageInfo[]) {
-      await Promise.all(packages.map(p => run(`${bunBinary} install -g ${p.name}@${p.version === ANY_VERSION_STRING
-        ? "latest"
-        : p.version
-      } -E`, {})));
+      if (packages.length === 0) return;
+      // Install in a single command: concurrent global installs race on the
+      // shared global package.json and clobber each other.
+      const specs = packages
+        .map(p => `${p.name}@${p.version === ANY_VERSION_STRING ? "latest" : p.version}`)
+        .join(" ");
+      await run(`${bunBinary} install -g ${specs} -E`, {});
     },
 
     async uninstall(packages: string[]) {
-      await Promise.all(packages.map(p => run(`${bunBinary} remove -g ${p}"`, {})))
+      if (packages.length === 0) return;
+      await run(`${bunBinary} remove -g ${packages.join(" ")}`, {});
     },
     async getInstalled() {
+      // A fresh system has no global package.json until the first global
+      // install creates it -- that means nothing is installed yet.
       if (!fs.existsSync(bunPackageJsonPath)) {
-        throw new Error(`Error getting all installed for bun: couldn't find the package json for bun globals in ${bunPackageJsonPath}.`, );
-
+        return [];
       }
 
       const contents = fs.readFileSync(bunPackageJsonPath).toString();

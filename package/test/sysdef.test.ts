@@ -308,7 +308,7 @@ describe("syncPackages", () => {
       ]]
     ]);
 
-    await syncPackages(requestedPackages, [mockProvider], false);
+    await syncPackages(requestedPackages, [mockProvider], false, async () => {});
 
     expect(toInstallPackages).toHaveLength(1);
     expect(toInstallPackages[0]!.name).toBe("package1");
@@ -336,7 +336,7 @@ describe("syncPackages", () => {
 
     const requestedPackages = new Map([["npm", []]]);
 
-    await syncPackages(requestedPackages, [mockProvider], false);
+    await syncPackages(requestedPackages, [mockProvider], false, async () => {});
 
     expect(toInstallPackages).toHaveLength(0);
     expect(toUninstallPackages).toHaveLength(1);
@@ -368,7 +368,7 @@ describe("syncPackages", () => {
       ]]
     ]);
 
-    await syncPackages(requestedPackages, [mockProvider], false);
+    await syncPackages(requestedPackages, [mockProvider], false, async () => {});
 
     expect(toInstallPackages).toHaveLength(0);
     expect(toUninstallPackages).toHaveLength(0);
@@ -398,18 +398,19 @@ describe("updateLockfile", () => {
 });
 
 describe("syncFiles", () => {
-  test("should create symlinks and write files", () => {
+  test("should create symlinks and write files", async () => {
     const symlinkCalls: Array<{dest: string, src: string}> = [];
     const fileCalls: Array<{path: string, content: string}> = [];
 
     const mockFilesystem: Filesystem = {
-      ensureSymlink: (dest: string, src: string) => {
+      ensureSymlink: async (dest: string, src: string) => {
         symlinkCalls.push({dest, src});
       },
-      writeFile: (path: string, content: string) => {
+      writeFile: async (path: string, content: string) => {
         fileCalls.push({path, content});
       },
-      exists: () => true
+      exists: async () => true,
+      copy: async () => {},
     };
 
     const store = new VariableStore();
@@ -430,7 +431,7 @@ describe("syncFiles", () => {
       }
     ];
 
-    syncFiles(modules, store, mockFilesystem);
+    await syncFiles(modules, store, mockFilesystem, "/root/sysdef");
 
     expect(symlinkCalls).toHaveLength(2);
     expect(symlinkCalls.find(call => call.dest === "/home/user/.config")).toBeDefined();

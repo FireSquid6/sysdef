@@ -106,8 +106,9 @@ const provider: ProviderGenerator = (run: Shell) => {
     },
 
     async getInstalled() {
-      // Get foreign/AUR packages
-      const result = await realShell(`pacman -Qm`, {});
+      // Get foreign/AUR packages. throwOnError:true suppresses throwing on a
+      // non-zero exit: `pacman -Qm` exits 1 when there are no foreign packages.
+      const result = await realShell(`pacman -Qm`, { throwOnError: true });
       const lines = result.stdout.trim().split('\n').filter(line => line.trim());
 
       return lines.map(line => {
