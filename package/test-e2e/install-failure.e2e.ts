@@ -81,4 +81,18 @@ describe.skipIf(!HAS_DOCKER)("arch-official install failure (e2e)", () => {
     const res = c.sync("--safe");
     expectCleanFailure(res, c);
   }, STEP_TIMEOUT);
+
+  test("uninstall of a nonexistent package fails fast with a clean error", () => {
+    const res = c.driver("arch-official", "uninstall", [BOGUS]);
+    expect(res.code).not.toBe(0);
+    expect(res.stdout).toContain("Failed to uninstall");
+    expect(res.stdout).not.toContain("Process called with");
+  }, STEP_TIMEOUT);
+
+  test("update of a nonexistent package fails fast with a clean error", () => {
+    const res = c.driver("arch-official", "update", [BOGUS]);
+    expect(res.code).not.toBe(0);
+    expect(res.stdout).toContain("Failed to update");
+    expect(res.stdout).not.toContain("Process called with");
+  }, STEP_TIMEOUT);
 });

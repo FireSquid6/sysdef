@@ -140,3 +140,43 @@ describe("provider install failure path", () => {
     expect(result.stdout).toContain("Failed to install");
   });
 });
+
+describe("provider uninstall / update failure paths", () => {
+  // uninstall() and update() fail fast (errorOut -> exit 1) with a clean message
+  // just like install(), rather than swallowing failures or leaking a raw stack.
+  const opScript = (file: string, call: string) => `
+    import gen from ${JSON.stringify(path.join(PROVIDERS, file))};
+    const failingShell = async () => ({ code: 1, stdout: "boom" });
+    const p = gen(failingShell);
+    await p.${call};
+    console.log("SHOULD_NOT_REACH");
+  `;
+
+  test("bun uninstall failure exits(1) with a clean message", () => {
+    const result = runScript(opScript("bun.ts", `uninstall(["does-not-exist"])`));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to uninstall");
+  });
+
+  test("apt uninstall failure exits(1) with a clean message", () => {
+    const result = runScript(opScript("apt.ts", `uninstall(["does-not-exist"])`));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to uninstall");
+  });
+
+  test("bun update failure exits(1) with a clean message", () => {
+    const result = runScript(opScript("bun.ts", `update(["does-not-exist"])`));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to update");
+  });
+
+  test("cargo update failure exits(1) with a clean message", () => {
+    const result = runScript(opScript("cargo.ts", `update(["does-not-exist"])`));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to update");
+  });
+});

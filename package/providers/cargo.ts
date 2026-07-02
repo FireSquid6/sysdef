@@ -24,7 +24,12 @@ const provider: ProviderGenerator = (run: Shell) => {
     },
 
     async uninstall(packages: string[]) {
-      await Promise.all(packages.map(p => run(`cargo uninstall ${p}`, {})));
+      await Promise.all(packages.map(async p => {
+        const result = await run(`cargo uninstall ${p}`, { throwOnError: true });
+        if (result.code !== 0) {
+          errorOut(`Failed to uninstall cargo package: ${p} (exit code ${result.code})`);
+        }
+      }));
     },
 
     async getInstalled() {
@@ -49,12 +54,15 @@ const provider: ProviderGenerator = (run: Shell) => {
     },
 
     async update(packages: string[]) {
-      if (packages.length === 0) {
-        const installed = await this.getInstalled();
-        await Promise.all(installed.map(p => run(`cargo install ${p.name}`, {})));
-      } else {
-        await Promise.all(packages.map(p => run(`cargo install ${p}`, {})));
-      }
+      const toUpdate = packages.length === 0
+        ? (await this.getInstalled()).map(p => p.name)
+        : packages;
+      await Promise.all(toUpdate.map(async name => {
+        const result = await run(`cargo install ${name}`, { throwOnError: true });
+        if (result.code !== 0) {
+          errorOut(`Failed to update cargo package: ${name} (exit code ${result.code})`);
+        }
+      }));
     },
   };
 };

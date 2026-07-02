@@ -38,7 +38,11 @@ const provider: ProviderGenerator = (run: Shell) => {
 
     async uninstall(packages: string[]) {
       if (packages.length === 0) return;
-      await run(`${bunBinary} remove -g ${packages.join(" ")}`, {});
+      const specs = packages.join(" ");
+      const result = await run(`${bunBinary} remove -g ${specs}`, { throwOnError: true });
+      if (result.code !== 0) {
+        errorOut(`Failed to uninstall bun packages: ${specs} (exit code ${result.code})`);
+      }
     },
     async getInstalled() {
       // A fresh system has no global package.json until the first global
@@ -64,7 +68,12 @@ const provider: ProviderGenerator = (run: Shell) => {
       });
     },
     async update(packages: string[]) {
-      await Promise.all(packages.map(p => run(`${bunBinary} update -g ${p}`, {})))
+      await Promise.all(packages.map(async p => {
+        const result = await run(`${bunBinary} update -g ${p}`, { throwOnError: true });
+        if (result.code !== 0) {
+          errorOut(`Failed to update bun package: ${p} (exit code ${result.code})`);
+        }
+      }))
     },
   }
 }

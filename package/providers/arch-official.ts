@@ -45,10 +45,11 @@ const provider: ProviderGenerator = (run: Shell) => {
         const result = await run(`pacman -Rs --noconfirm ${string}`, {
           displayOutput: true,
           asRoot: true,
+          throwOnError: true,
         });
 
         if (result.code !== 0) {
-          console.log(`Error uninstalling packages: ${part}. See the logs above`);
+          errorOut(`Failed to uninstall arch-official packages: ${string} (exit code ${result.code})`);
         }
       }
     },
@@ -100,10 +101,11 @@ const provider: ProviderGenerator = (run: Shell) => {
         const result = await run(`pacman -Syu --noconfirm ${string}`, {
           displayOutput: true,
           asRoot: true,
+          throwOnError: true,
         });
 
         if (result.code !== 0) {
-          console.log(`Error updating packages: ${part}. See the logs above`);
+          errorOut(`Failed to update arch-official packages: ${string} (exit code ${result.code})`);
         }
       }
     },

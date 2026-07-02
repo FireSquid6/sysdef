@@ -37,7 +37,11 @@ const provider: ProviderGenerator = (run: Shell) => {
       for (const part of partitions) {
         const string = part.join(" ");
         console.log(`Uninstalling ${string}`);
-        await run(`sudo apt remove -y ${string}`, { throwOnError: true });
+        const result = await run(`sudo apt remove -y ${string}`, { throwOnError: true });
+        if (result.code !== 0) {
+          console.log(result.stdout);
+          errorOut(`Failed to uninstall apt packages: ${string} (exit code ${result.code})`);
+        }
       }
     },
 
@@ -62,9 +66,17 @@ const provider: ProviderGenerator = (run: Shell) => {
 
     async update(packages: string[]) {
       if (packages.length === 0) {
-        await run(`sudo apt update && sudo apt upgrade -y`, { throwOnError: true });
+        const result = await run(`sudo apt update && sudo apt upgrade -y`, { throwOnError: true });
+        if (result.code !== 0) {
+          errorOut(`Failed to update apt packages (exit code ${result.code})`);
+        }
       } else {
-        await Promise.all(packages.map(p => run(`sudo apt install -y ${p}`, { throwOnError: true })));
+        await Promise.all(packages.map(async p => {
+          const result = await run(`sudo apt install -y ${p}`, { throwOnError: true });
+          if (result.code !== 0) {
+            errorOut(`Failed to update apt package: ${p} (exit code ${result.code})`);
+          }
+        }));
       }
     },
   };

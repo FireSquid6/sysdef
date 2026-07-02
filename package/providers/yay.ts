@@ -43,10 +43,11 @@ const provider: ProviderGenerator = (run: Shell) => {
         console.log(`Uninstalling ${string}`);
         const result = await run(`yay -Rs --noconfirm ${string}`, {
           displayOutput: true,
+          throwOnError: true,
         });
 
         if (result.code !== 0) {
-          console.log(`Erorr uninstalling packages: ${part}. See the logs above`);
+          errorOut(`Failed to uninstall yay packages: ${string} (exit code ${result.code})`);
         }
       }
     },
@@ -75,12 +76,12 @@ const provider: ProviderGenerator = (run: Shell) => {
 
       for (const part of partitions) {
         const string = part.join(" ");
-        console.log(`Uninstalling ${string}`);
-        const result = await run(`yay -Syu --noconfirm ${string}`, {});
+        console.log(`Updating ${string}`);
+        const result = await run(`yay -Syu --noconfirm ${string}`, { throwOnError: true });
 
         if (result.code !== 0) {
-          console.log(`Erorr updating packages: ${part}. See the logs below`);
           console.log(result.stdout);
+          errorOut(`Failed to update yay packages: ${string} (exit code ${result.code})`);
         }
       }
     },
