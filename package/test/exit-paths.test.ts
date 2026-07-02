@@ -139,6 +139,60 @@ describe("provider install failure path", () => {
     expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
     expect(result.stdout).toContain("Failed to install");
   });
+
+  test("npm install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("npm", "npm.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
+  });
+
+  test("pipx install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("pipx", "pipx.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
+  });
+
+  test("go install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("go", "go.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
+  });
+
+  test("dnf install failure exits(1) with a clean message", () => {
+    const result = runScript(failScript("dnf", "dnf.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to install");
+  });
+});
+
+describe("version-pin rejection (pacman family)", () => {
+  // arch-official and aur cannot install an arbitrary pinned version, so a pinned
+  // request must abort cleanly rather than silently ignore the pin.
+  const pinScript = (provider: string, file: string) => `
+    import gen from ${JSON.stringify(path.join(PROVIDERS, file))};
+    const okShell = async () => ({ code: 0, stdout: "" });
+    const p = gen(okShell);
+    await p.install([{ name: "vim", version: "9.0", provider: ${JSON.stringify(provider)} }]);
+    console.log("SHOULD_NOT_REACH");
+  `;
+
+  test("arch-official rejects a pinned version", () => {
+    const result = runScript(pinScript("arch-official", "arch-official.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("cannot install a specific version");
+  });
+
+  test("aur rejects a pinned version", () => {
+    const result = runScript(pinScript("aur", "aur.ts"));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("cannot install a specific version");
+  });
 });
 
 describe("provider uninstall / update failure paths", () => {

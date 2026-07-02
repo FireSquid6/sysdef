@@ -1,6 +1,10 @@
-import { ANY_VERSION_STRING, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
+import { ANY_VERSION_STRING, defaultShell, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 
 // cargo provider - installs Rust packages globally
+
+// we use the default shell when getting the list of all installed packages since
+// we want that to happen even in a dry run
+const realShell = defaultShell;
 
 const provider: ProviderGenerator = (run: Shell) => {
   return {
@@ -33,7 +37,7 @@ const provider: ProviderGenerator = (run: Shell) => {
     },
 
     async getInstalled() {
-      const result = await run(`cargo install --list`, {});
+      const result = await realShell(`cargo install --list`, {});
       const lines = result.stdout.trim().split('\n').filter(line => line.trim());
       const packages = [];
       

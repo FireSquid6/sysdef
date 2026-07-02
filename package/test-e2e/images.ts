@@ -13,6 +13,10 @@ export const IMAGES = {
   debian: "sysdef-e2e-debian",
   rust: "sysdef-e2e-rust",
   arch: "sysdef-e2e-arch",
+  node: "sysdef-e2e-node",
+  python: "sysdef-e2e-python",
+  go: "sysdef-e2e-go",
+  fedora: "sysdef-e2e-fedora",
 } as const;
 
 const built = new Set<string>();
@@ -36,7 +40,27 @@ export function rustImage(): string {
   return ensure(IMAGES.rust, "rust.Dockerfile");
 }
 
-/** Arch Linux + pacman + bun. Used for arch-official (and base for aur/yay). */
+/** Arch Linux + pacman + bun (+ non-root `builder` user). arch-official / aur. */
 export function archImage(): string {
   return ensure(IMAGES.arch, "arch.Dockerfile");
+}
+
+/** Node + npm + bun. Used for the npm provider. */
+export function nodeImage(): string {
+  return ensure(IMAGES.node, "node.Dockerfile");
+}
+
+/** Debian + python3 + pipx + bun. Used for the pipx provider. */
+export function pythonImage(): string {
+  return ensure(IMAGES.python, "python.Dockerfile");
+}
+
+/** Official golang image + bun. Used for the go provider. */
+export function goImage(): string {
+  return ensure(IMAGES.go, "go.Dockerfile");
+}
+
+/** Fedora + dnf + bun. Used for the dnf provider. */
+export function fedoraImage(): string {
+  return ensure(IMAGES.fedora, "fedora.Dockerfile");
 }

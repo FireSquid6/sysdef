@@ -23,6 +23,9 @@ const m: ModuleGenerator = () => ({
     "{HOME}/.sysdef-linkeddir": "./dotfiles/somedir",
   },
   packages: {},
+  onEverySync: async (shell) => {
+    await shell("touch /root/.sysdef-ran", {});
+  },
 });
 
 export default m;
@@ -81,5 +84,14 @@ describe.skipIf(!HAS_DOCKER)("sysdef file sync (e2e)", () => {
     expect(res.code).toBe(0);
     expect(c.exec("cat /root/.sysdef-generated").stdout).toBe("home is /root\n");
     expect(c.exec("test -L /root/.sysdef-linked").code).toBe(0);
+  }, STEP_TIMEOUT);
+
+  test("onEverySync events run during a full sync", () => {
+    // -f (files-only) returns before events, so run a full sync. The config has
+    // no providers, so this only links files and fires events.
+    expect(c.exec("rm -f /root/.sysdef-ran").code).toBe(0);
+    const res = c.sync();
+    expect(res.code).toBe(0);
+    expect(c.exec("test -f /root/.sysdef-ran").code).toBe(0);
   }, STEP_TIMEOUT);
 });

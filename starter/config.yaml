@@ -1,6 +1,6 @@
 # put all the providers to laod here
 providers:
-  - yay
+  - bun
 # all modules can go here
 modules:
   - example

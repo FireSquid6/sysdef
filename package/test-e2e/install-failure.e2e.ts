@@ -54,7 +54,6 @@ describe.skipIf(!HAS_DOCKER)("bun install failure (e2e)", () => {
   beforeAll(() => {
     c = new SysdefContainer(debianImage(), "bun-fail");
     c.start();
-    expect(c.exec(`sed -i 's#/home/\${BUN_USER}/.bun#/root/.bun#g' /sysdef/providers/bun.ts`).code).toBe(0);
     c.writeConfig(singleModuleConfig("bun", "pkgs"));
     c.writeModule("pkgs", packagesModule("pkgs", "bun", [BOGUS]));
   }, BUILD_TIMEOUT);

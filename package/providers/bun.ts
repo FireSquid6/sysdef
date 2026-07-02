@@ -1,13 +1,15 @@
 import { ANY_VERSION_STRING, errorOut, type PackageInfo, type ProviderGenerator, type Shell } from "../sysdef-src/sysdef";
 import fs from "fs";
+import os from "os";
+import path from "path";
 import { v } from "../sysdef-src/validation";
 
 
-// getting errors? You need to update BUN_USER to be the user you have bun installed with (bun does a per user installation)
-// you typically use a different installation of bun than the one that comes with sysdef
-const BUN_USER = "firesquid"
-const bunBinary = `/home/${BUN_USER}/.bun/bin/bun`;
-const bunPackageJsonPath = `/home/${BUN_USER}/.bun/install/global/package.json`
+// bun installs per-user under ~/.bun (overridable with $BUN_INSTALL). Note this
+// is your own bun install, typically different from the bun bundled with sysdef.
+const bunDir = process.env.BUN_INSTALL || path.join(os.homedir(), ".bun");
+const bunBinary = path.join(bunDir, "bin", "bun");
+const bunPackageJsonPath = path.join(bunDir, "install", "global", "package.json");
 
 const packageJsonSchema = v.obj({
   dependencies: v.record(v.string(), v.string()),

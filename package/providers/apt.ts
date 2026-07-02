@@ -66,9 +66,15 @@ const provider: ProviderGenerator = (run: Shell) => {
 
     async update(packages: string[]) {
       if (packages.length === 0) {
-        const result = await run(`sudo apt update && sudo apt upgrade -y`, { throwOnError: true });
-        if (result.code !== 0) {
-          errorOut(`Failed to update apt packages (exit code ${result.code})`);
+        // defaultShell does not run through a shell, so `&&` can't be used --
+        // run the two commands separately.
+        const updated = await run(`sudo apt update`, { throwOnError: true });
+        if (updated.code !== 0) {
+          errorOut(`Failed to update apt package lists (exit code ${updated.code})`);
+        }
+        const upgraded = await run(`sudo apt upgrade -y`, { throwOnError: true });
+        if (upgraded.code !== 0) {
+          errorOut(`Failed to upgrade apt packages (exit code ${upgraded.code})`);
         }
       } else {
         await Promise.all(packages.map(async p => {

@@ -10,10 +10,13 @@ import {
 import aptGen from "../providers/apt";
 import archGen from "../providers/arch-official";
 import aurGen from "../providers/aur";
-import yayGen from "../providers/yay";
 import cargoGen from "../providers/cargo";
 import bunGen from "../providers/bun";
 import customGen from "../providers/custom";
+import npmGen from "../providers/npm";
+import pipxGen from "../providers/pipx";
+import goGen from "../providers/go";
+import dnfGen from "../providers/dnf";
 
 // A recording mock Shell. Providers receive this via their generator, so every
 // command they build with the injected `run` is captured here. Canned responses
@@ -61,11 +64,12 @@ describe("apt provider", () => {
     expect(cmds()).toEqual(["sudo apt remove -y vim git"]);
   });
 
-  test("update with no packages does a full upgrade", async () => {
+  test("update with no packages does a full upgrade (two separate commands)", async () => {
     const { shell, cmds } = mockShell();
     const p = aptGen(shell);
     await p.update([]);
-    expect(cmds()).toEqual(["sudo apt update && sudo apt upgrade -y"]);
+    // defaultShell has no shell, so `&&` can't be used -- must be two commands
+    expect(cmds()).toEqual(["sudo apt update", "sudo apt upgrade -y"]);
   });
 
   test("update with packages installs each", async () => {
@@ -94,12 +98,14 @@ describe("arch-official provider", () => {
     expect(calls[0]!.options.asRoot).toBe(true);
   });
 
-  test("install pins versions with `=`", async () => {
+  test("install uses plain names (no version syntax)", async () => {
     const { shell, cmds } = mockShell();
     const p = archGen(shell);
-    await p.install([pkg("vim", "9.0", "arch-official")]);
-    expect(cmds()).toEqual(["pacman -S --noconfirm vim=9.0"]);
+    await p.install([pkg("vim", ANY_VERSION_STRING, "arch-official")]);
+    expect(cmds()).toEqual(["pacman -S --noconfirm vim"]);
   });
+
+  // pinned-version rejection (errorOut -> exit 1) is covered in exit-paths.test.ts
 
   test("uninstall uses pacman -Rs as root", async () => {
     const { shell, calls, cmds } = mockShell();
@@ -126,19 +132,15 @@ describe("arch-official provider", () => {
 });
 
 describe("aur provider", () => {
-  test("install uses pacman -S as root", async () => {
+  // install()/update() build from the AUR via realShell (git clone + makepkg), so
+  // they aren't mock-testable here; they're covered by the gated aur.e2e.ts.
+  // pinned-version rejection is covered in exit-paths.test.ts.
+  test("uninstall uses pacman -Rs as root", async () => {
     const { shell, calls, cmds } = mockShell();
     const p = aurGen(shell);
-    await p.install([pkg("yay", ANY_VERSION_STRING, "aur")]);
-    expect(cmds()).toEqual(["pacman -S --noconfirm yay"]);
+    await p.uninstall(["some-aur-pkg"]);
+    expect(cmds()).toEqual(["pacman -Rs --noconfirm some-aur-pkg"]);
     expect(calls[0]!.options.asRoot).toBe(true);
-  });
-
-  test("uninstall uses pacman -Rs as root", async () => {
-    const { shell, cmds } = mockShell();
-    const p = aurGen(shell);
-    await p.uninstall(["yay"]);
-    expect(cmds()).toEqual(["pacman -Rs --noconfirm yay"]);
   });
 
   test("checkInstallation probes with `which pacman`", async () => {
@@ -146,37 +148,6 @@ describe("aur provider", () => {
     const p = aurGen(shell);
     await p.checkInstallation!();
     expect(cmds()).toEqual(["which pacman"]);
-  });
-});
-
-describe("yay provider", () => {
-  test("install uses yay -S (not as root)", async () => {
-    const { shell, calls, cmds } = mockShell();
-    const p = yayGen(shell);
-    await p.install([pkg("google-chrome", ANY_VERSION_STRING, "yay")]);
-    expect(cmds()).toEqual(["yay -S --noconfirm google-chrome"]);
-    expect(calls[0]!.options.asRoot).toBeUndefined();
-  });
-
-  test("uninstall uses yay -Rs", async () => {
-    const { shell, cmds } = mockShell();
-    const p = yayGen(shell);
-    await p.uninstall(["google-chrome"]);
-    expect(cmds()).toEqual(["yay -Rs --noconfirm google-chrome"]);
-  });
-
-  test("update uses yay -Syu", async () => {
-    const { shell, cmds } = mockShell();
-    const p = yayGen(shell);
-    await p.update(["google-chrome"]);
-    expect(cmds()).toEqual(["yay -Syu --noconfirm google-chrome"]);
-  });
-
-  test("checkInstallation probes with `which yay`", async () => {
-    const { shell, cmds } = mockShell();
-    const p = yayGen(shell);
-    await p.checkInstallation!();
-    expect(cmds()).toEqual(["which yay"]);
   });
 });
 
@@ -202,36 +173,15 @@ describe("cargo provider", () => {
     expect(cmds()).toEqual(["cargo uninstall ripgrep"]);
   });
 
-  test("getInstalled parses `cargo install --list`", async () => {
-    const { shell } = mockShell({
-      "cargo install --list": {
-        stdout:
-          "ripgrep v13.0.0:\n    rg\ncargo-edit v0.11.9:\n    cargo-add\n    cargo-rm\n",
-      },
-    });
+  test("update with packages reinstalls each at latest", async () => {
+    const { shell, cmds } = mockShell();
     const p = cargoGen(shell);
-    const installed = await p.getInstalled();
-    expect(installed).toEqual([
-      { name: "ripgrep", provider: "cargo", version: "13.0.0" },
-      { name: "cargo-edit", provider: "cargo", version: "0.11.9" },
-    ]);
+    await p.update(["ripgrep"]);
+    expect(cmds()).toEqual(["cargo install ripgrep"]);
   });
 
-  test("getInstalled returns empty for empty output", async () => {
-    const { shell } = mockShell({ "cargo install --list": { stdout: "" } });
-    const p = cargoGen(shell);
-    expect(await p.getInstalled()).toEqual([]);
-  });
-
-  test("update with no packages reinstalls everything currently installed", async () => {
-    const { shell, cmds } = mockShell({
-      "cargo install --list": { stdout: "ripgrep v13.0.0:\n    rg\n" },
-    });
-    const p = cargoGen(shell);
-    await p.update([]);
-    expect(cmds()).toContain("cargo install --list");
-    expect(cmds()).toContain("cargo install ripgrep");
-  });
+  // getInstalled uses realShell (so it works under --dry-run); its parsing is
+  // covered by cargo.e2e.ts rather than a mock here.
 });
 
 describe("bun provider", () => {
@@ -296,5 +246,147 @@ describe("custom provider", () => {
     await p.update(["whatever"]);
     expect(await p.getInstalled()).toEqual([]);
     expect(cmds()).toEqual([]); // never shells out
+  });
+});
+
+describe("npm provider", () => {
+  test("install batches into one `npm install -g` with @version / @latest", async () => {
+    const { shell, cmds } = mockShell();
+    const p = npmGen(shell);
+    await p.install([pkg("is-odd", ANY_VERSION_STRING, "npm"), pkg("left-pad", "1.2.0", "npm")]);
+    expect(cmds()).toEqual(["npm install -g is-odd@latest left-pad@1.2.0"]);
+  });
+
+  test("install with no packages shells out nothing", async () => {
+    const { shell, cmds } = mockShell();
+    const p = npmGen(shell);
+    await p.install([]);
+    expect(cmds()).toEqual([]);
+  });
+
+  test("uninstall uses `npm uninstall -g`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = npmGen(shell);
+    await p.uninstall(["is-odd", "left-pad"]);
+    expect(cmds()).toEqual(["npm uninstall -g is-odd left-pad"]);
+  });
+
+  test("update installs each at latest", async () => {
+    const { shell, cmds } = mockShell();
+    const p = npmGen(shell);
+    await p.update(["typescript"]);
+    expect(cmds()).toEqual(["npm install -g typescript@latest"]);
+  });
+
+  test("checkInstallation probes with `which npm`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = npmGen(shell);
+    await p.checkInstallation!();
+    expect(cmds()).toEqual(["which npm"]);
+  });
+});
+
+describe("pipx provider", () => {
+  test("install uses `pipx install` per package with == version syntax", async () => {
+    const { shell, cmds } = mockShell();
+    const p = pipxGen(shell);
+    await p.install([pkg("pycowsay", ANY_VERSION_STRING, "pipx"), pkg("black", "23.1.0", "pipx")]);
+    expect(cmds()).toEqual(["pipx install --force pycowsay", "pipx install --force black==23.1.0"]);
+  });
+
+  test("uninstall uses `pipx uninstall`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = pipxGen(shell);
+    await p.uninstall(["pycowsay"]);
+    expect(cmds()).toEqual(["pipx uninstall pycowsay"]);
+  });
+
+  test("update uses `pipx upgrade`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = pipxGen(shell);
+    await p.update(["pycowsay"]);
+    expect(cmds()).toEqual(["pipx upgrade pycowsay"]);
+  });
+
+  test("checkInstallation probes with `which pipx`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = pipxGen(shell);
+    await p.checkInstallation!();
+    expect(cmds()).toEqual(["which pipx"]);
+  });
+});
+
+describe("go provider", () => {
+  test("install uses `go install path@version` (default latest)", async () => {
+    const { shell, cmds } = mockShell();
+    const p = goGen(shell);
+    await p.install([
+      pkg("rsc.io/2fa", "v1.2.0", "go"),
+      pkg("golang.org/x/tools/cmd/stringer", ANY_VERSION_STRING, "go"),
+    ]);
+    expect(cmds()).toEqual([
+      "go install rsc.io/2fa@v1.2.0",
+      "go install golang.org/x/tools/cmd/stringer@latest",
+    ]);
+  });
+
+  test("uninstall removes the binary (basename of the module path) from GOBIN", async () => {
+    // GOBIN is resolved via realShell (so it works in --dry-run), so it isn't
+    // captured here; we assert the rm targets the binary basename "2fa".
+    const { shell, cmds } = mockShell();
+    const p = goGen(shell);
+    await p.uninstall(["rsc.io/2fa"]);
+    expect(cmds().some(c => /^rm -f .*2fa$/.test(c))).toBe(true);
+  });
+
+  test("update installs each at latest", async () => {
+    const { shell, cmds } = mockShell();
+    const p = goGen(shell);
+    await p.update(["rsc.io/2fa"]);
+    expect(cmds()).toEqual(["go install rsc.io/2fa@latest"]);
+  });
+
+  test("checkInstallation probes with `which go`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = goGen(shell);
+    await p.checkInstallation!();
+    expect(cmds()).toEqual(["which go"]);
+  });
+});
+
+describe("dnf provider", () => {
+  test("install batches into one `dnf install -y` with name-version syntax", async () => {
+    const { shell, cmds } = mockShell();
+    const p = dnfGen(shell);
+    await p.install([pkg("sl", ANY_VERSION_STRING, "dnf"), pkg("cowsay", "3.04-1.fc40", "dnf")]);
+    expect(cmds()).toEqual(["sudo dnf install -y sl cowsay-3.04-1.fc40"]);
+  });
+
+  test("uninstall uses `dnf remove -y`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = dnfGen(shell);
+    await p.uninstall(["sl", "cowsay"]);
+    expect(cmds()).toEqual(["sudo dnf remove -y sl cowsay"]);
+  });
+
+  test("update with no packages upgrades everything", async () => {
+    const { shell, cmds } = mockShell();
+    const p = dnfGen(shell);
+    await p.update([]);
+    expect(cmds()).toEqual(["sudo dnf upgrade -y"]);
+  });
+
+  test("update with packages upgrades each", async () => {
+    const { shell, cmds } = mockShell();
+    const p = dnfGen(shell);
+    await p.update(["sl"]);
+    expect(cmds()).toEqual(["sudo dnf upgrade -y sl"]);
+  });
+
+  test("checkInstallation probes with `which dnf`", async () => {
+    const { shell, cmds } = mockShell();
+    const p = dnfGen(shell);
+    await p.checkInstallation!();
+    expect(cmds()).toEqual(["which dnf"]);
   });
 });

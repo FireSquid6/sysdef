@@ -21,10 +21,8 @@ describe.skipIf(!HAS_DOCKER)("bun provider (e2e)", () => {
     const image = debianImage();
     c = new SysdefContainer(image, "bun");
     c.start();
-    // The bun provider hard-codes /home/<user>/.bun; we run as root, so point it
-    // at the root-owned bun install (providers are meant to be edited in place).
-    const patch = c.exec(`sed -i 's#/home/\${BUN_USER}/.bun#/root/.bun#g' /sysdef/providers/bun.ts`);
-    expect(patch.code).toBe(0);
+    // The bun provider now derives its path from $HOME (os.homedir()), which is
+    // /root in-container, matching the bun install -- no patching needed.
     c.writeConfig(singleModuleConfig("bun", "pkgs"));
   }, BUILD_TIMEOUT);
 
