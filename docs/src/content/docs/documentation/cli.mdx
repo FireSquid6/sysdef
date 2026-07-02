@@ -63,13 +63,31 @@ sysdef sync --files-only
 sysdef sync --safe
 ```
 
+### `sysdef update [provider] [packages...]`
+
+Updates managed packages to their newest available versions and refreshes the
+lockfile. With no arguments it updates every package for every configured
+provider; pass a provider (and optionally specific package names) to narrow it.
+
+**Examples:**
+```bash
+# Update everything
+sysdef update
+
+# Update all packages for one provider
+sysdef update npm
+
+# Update specific packages
+sysdef update npm typescript left-pad
+```
+
 ### `sysdef providers`
 
 Lists all configured providers and checks their installation status. Each provider can define a `checkInstallation()` function to verify it's working correctly.
 
 **Example output:**
 ```
-yay is installed correctly
+arch-official is installed correctly
 apt is installed correctly
 bun failed when checking its own installation: command not found
 ```
@@ -86,13 +104,13 @@ Shows all packages currently installed through sysdef providers.
 # List packages from all providers
 sysdef list-installed
 
-# List only packages from yay provider
-sysdef list-installed yay
+# List only packages from the arch-official provider
+sysdef list-installed arch-official
 ```
 
 **Example output:**
 ```
-Currently installed packages for yay:
+Currently installed packages for arch-official:
   firefox@latest
   git@2.42.0
   neovim@0.9.4

@@ -24,7 +24,7 @@ Sysdef is a hackable system declaration manager written and configured in [Types
 </FileTree>
 
 
-Each [Module](/guides/modules) is a set of directories, files, and packages you want installed, created, and managed on your machine. You also have [Providers](/guides/providers) which provide an interface for interacting with a package manager. Some default providers for the package managers `yay`, `apt`, and `bun` are included. It's expected that you have those installed already.
+Each [Module](/guides/modules) is a set of directories, files, and packages you want installed, created, and managed on your machine. You also have [Providers](/guides/providers) which provide an interface for interacting with a package manager. Some default providers for the package managers `apt`, `arch-official`, `aur`, `dnf`, `bun`, `npm`, `pipx`, `go`, and `cargo` are included. It's expected that you have the ones you use installed already.
 
 The source code for sysdef is stored locally and is very small (~1500 LOC). It's copied directly into `sysdef-src` and built to be simple and hackable. In the `bin` directory is a local installation of bun (an alternative of node used to run typescript code) alongside a `sysdef` executable. You should probably add that `bin` directory to your path. 
 
@@ -38,7 +38,7 @@ The `config.yaml` file contains two lists: the list of all modules, and the list
 
 ```yaml
 providers:
-  - yay
+  - apt
 # all modules can go here
 modules:
   - example

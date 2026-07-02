@@ -5,7 +5,7 @@ sidebar:
     order: 400
 ---
 
-Providers are sysdef's interface to package managers. They abstract away the differences between various package management systems (yay, apt, bun, etc.) and provide a unified way for modules to declare package dependencies.
+Providers are sysdef's interface to package managers. They abstract away the differences between various package management systems (apt, pacman, bun, etc.) and provide a unified way for modules to declare package dependencies.
 
 ## Provider Interface
 
@@ -148,9 +148,9 @@ const result = await shell("apt list --installed", {});
 const packages = parseAptOutput(result.stdout);
 
 // Non-failing command (for checking if tool exists)
-const check = await shell("which yay", { throwOnError: false });
+const check = await shell("which pacman", { throwOnError: true });
 if (check.code !== 0) {
-  throw new Error("yay not found in PATH");
+  throw new Error("pacman not found in PATH");
 }
 ```
 
@@ -184,9 +184,16 @@ The sync process respects:
 
 Sysdef includes default providers for common package managers:
 
-- **yay**: Arch Linux AUR helper
-- **apt**: Debian/Ubuntu package manager  
-- **bun**: JavaScript runtime package manager
+- **apt**: Debian/Ubuntu system packages
+- **arch-official**: Arch Linux official repos (pacman)
+- **aur**: Arch User Repository (clones + builds with makepkg)
+- **dnf**: Fedora/RHEL system packages
+- **bun**: global bun (JavaScript) packages
+- **npm**: global npm (JavaScript) packages
+- **pipx**: isolated Python CLI applications
+- **go**: `go install` binaries
+- **cargo**: Rust crates
+- **custom**: a stub for your own logic
 
 These serve as both functional providers and reference implementations for creating custom providers.
 

@@ -32,11 +32,11 @@ The repo contains the following directories:
 
 # To Do
 - [ ] custom packages
-- [ ] events
+- [x] events
 - [ ] auto config generator
-- [ ] e2e test suite with docker
-- [ ] use pacman instead of yay
-- [ ] custom aur provider 
+- [x] e2e test suite with docker
+- [x] use pacman instead of yay
+- [x] custom aur provider
 - [x] docs
 - [ ] pull and update providers with a command
 - [ ] self update command

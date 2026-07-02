@@ -36,7 +36,7 @@ const generator: ModuleGenerator = (shell) => {
       "EXAMPLE_VAR": "example_value"
     },
     packages: {
-      "yay": ["firefox", "git"],
+      "arch-official": ["firefox", "git"],
       "apt": ["curl", "wget"]
     },
     directories: {
@@ -77,8 +77,7 @@ Maps provider names to arrays of package specifications. Package specifications 
 Example:
 ```ts
 packages: {
-  "yay": ["firefox", "git:2.42.0", "nodejs:>=18"],
-  "apt": ["curl", "wget"],
+  "apt": ["curl", "wget", "git:1:2.42.0-1"],
   "bun": ["typescript", "@types/node:20.8.0"]
 }
 ```

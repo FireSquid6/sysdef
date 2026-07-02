@@ -10,7 +10,7 @@ Sysdef is a declarative, provider-agnostic package/dotfile manager (think Nix-li
 
 - `package/` — the core codebase that gets installed. Its subdirs are copied wholesale into a user install by `scripts/initialize-workspace.sh`:
   - `sysdef-src/` — all application logic
-  - `providers/` — one file per package-manager backend (apt, yay, aur, arch-official, cargo, bun, custom)
+  - `providers/` — one file per package-manager backend (apt, arch-official, aur, dnf, cargo, bun, npm, pipx, go, custom)
   - `bin/sysdef`, `test/`, `package.json`, `tsconfig.json`
 - `starter/` — files seeded into a *fresh* user install (`config.yaml`, an example module, the `bin/sysdef` launcher shim)
 - `scripts/` — `clone-and-initialize.sh` (curl-piped installer) → `initialize-workspace.sh` (builds `~/sysdef`, installs Bun)
