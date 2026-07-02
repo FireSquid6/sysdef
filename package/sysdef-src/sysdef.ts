@@ -279,10 +279,12 @@ export async function syncPackages(
   allPackages: Map<string, PackageInfo[]>,
   providers: Provider[],
   noRemove: boolean,
+  managed: Map<string, Set<string>>,
   confirm: (prompt: string) => Promise<void> = promptForOk,
 ) {
   for (const provider of providers) {
     const packages = allPackages.get(provider.name) ?? [];
+    const managedForProvider = managed.get(provider.name) ?? new Set<string>();
     const toInstall: PackageInfo[] = [];
     const noChange: PackageInfo[] = [];
     const toUninstall: PackageInfo[] = [];
@@ -304,8 +306,11 @@ export async function syncPackages(
       }
     }
 
+    // Only remove packages sysdef itself installed (i.e. recorded as managed in
+    // the lockfile) that are no longer requested. Packages the user installed by
+    // other means are never touched.
     for (const p of alreadyInstalledInfos) {
-      if (!requestedSet.hasAnyVersion(p)) {
+      if (managedForProvider.has(p.name) && !requestedSet.hasAnyVersion(p)) {
         toUninstall.push(p);
       }
     }
@@ -334,11 +339,37 @@ export async function syncPackages(
   }
 }
 
-export async function updateLockfile(providers: Provider[], lockfile: Lockfile) {
+// The lockfile is the record of what sysdef manages. After a sync we rewrite each
+// provider's section to be exactly the requested packages, pinned to their
+// actually-installed version (so unversioned requests stay pinned on later syncs).
+// Packages no longer requested are dropped; packages installed by other means are
+// never recorded.
+export async function updateLockfile(
+  requested: Map<string, PackageInfo[]>,
+  providers: Provider[],
+  lockfile: Lockfile,
+) {
   for (const provider of providers) {
-    const packages = await provider.getInstalled();
-    for (const p of packages) {
-      lockfile.setVersion(p.provider, p.name, p.version);
+    const req = requested.get(provider.name) ?? [];
+    const requestedNames = new Set(req.map(p => p.name));
+
+    const installedVersions = new Map<string, string>();
+    for (const p of await provider.getInstalled()) {
+      installedVersions.set(p.name, p.version);
+    }
+
+    // Drop managed entries that are no longer requested.
+    for (const name of lockfile.getPackages(provider.name)) {
+      if (!requestedNames.has(name)) {
+        lockfile.delete(provider.name, name);
+      }
+    }
+
+    // Record each requested package at its installed version (fall back to the
+    // requested version if we couldn't read it back).
+    for (const p of req) {
+      const version = installedVersions.get(p.name) ?? p.version;
+      lockfile.setVersion(provider.name, p.name, version);
     }
   }
 }
@@ -373,7 +404,11 @@ export async  function syncFiles(modules: Module[], baseStore: VariableStore, fs
   }
 }
 
-export async function runEvents(modules: Module[]) {
-  console.log("Events not created yet");
+export async function runEvents(modules: Module[], shell: Shell) {
+  for (const mod of modules) {
+    if (mod.onEverySync) {
+      await mod.onEverySync(shell);
+    }
+  }
 }
 

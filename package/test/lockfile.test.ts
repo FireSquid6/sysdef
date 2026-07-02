@@ -45,6 +45,28 @@ describe("Lockfile", () => {
       expect(lf.getVersion("apt", "vim")).toBeUndefined();
     });
 
+    test("getPackages lists recorded package names for a provider", () => {
+      const lf = new Lockfile();
+      lf.setVersion("apt", "vim", "8.2");
+      lf.setVersion("apt", "git", "2.39");
+      lf.setVersion("cargo", "ripgrep", "13.0.0");
+      expect(lf.getPackages("apt").sort()).toEqual(["git", "vim"]);
+      expect(lf.getPackages("cargo")).toEqual(["ripgrep"]);
+    });
+
+    test("getPackages returns [] for an unknown provider", () => {
+      const lf = new Lockfile();
+      expect(lf.getPackages("apt")).toEqual([]);
+    });
+
+    test("getPackages reflects delete", () => {
+      const lf = new Lockfile();
+      lf.setVersion("apt", "vim", "8.2");
+      lf.setVersion("apt", "git", "2.39");
+      lf.delete("apt", "vim");
+      expect(lf.getPackages("apt")).toEqual(["git"]);
+    });
+
     test("delete is a no-op for unknown provider/package", () => {
       const lf = new Lockfile();
       expect(() => lf.delete("apt", "vim")).not.toThrow();
