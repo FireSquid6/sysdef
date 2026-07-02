@@ -3,13 +3,37 @@ import path from "path";
 import { loadModules, loadProviders, loadVariables } from "./loaders";
 import { Lockfile } from "./lockfile";
 import { dryFilesystem, normalFilesystem } from "./connections";
-import { syncPackages, runEvents, updateLockfile, syncFiles, getPackageList, type PackageInfo, errorOut } from "./sysdef";
+import { syncPackages, runEvents, updateLockfile, syncFiles, getPackageList, type PackageInfo, errorOut, defaultShell, dryShell } from "./sysdef";
 import { Command } from "@commander-js/extra-typings";
 import { readConfig } from "./configuration";
 
-// defaults to $HOME/sysdef. You could change this if you'd like! 
+// defaults to $HOME/sysdef. You could change this if you'd like!
 function getRootDir() {
   return process.env.SYSDEF_ROOT_DIR ?? path.join(os.homedir(), "sysdef");
+}
+
+// group a flat package list into a provider -> packages map
+function toProviderMap(list: PackageInfo[]): Map<string, PackageInfo[]> {
+  const map: Map<string, PackageInfo[]> = new Map();
+  for (const p of list) {
+    const current = map.get(p.provider);
+    if (current) {
+      current.push(p);
+    } else {
+      map.set(p.provider, [p]);
+    }
+  }
+  return map;
+}
+
+// the set of packages sysdef currently manages (recorded in the lockfile), per
+// provider. sysdef only removes packages in this set.
+function managedSet(providers: { name: string }[], lockfile: Lockfile): Map<string, Set<string>> {
+  const managed: Map<string, Set<string>> = new Map();
+  for (const p of providers) {
+    managed.set(p.name, new Set(lockfile.getPackages(p.name)));
+  }
+  return managed;
 }
 
 
@@ -57,13 +81,13 @@ const syncCommand = cli.command("sync")
 
     const modules = await loadModules(rootDir, dryRun, config.modules);
     const providers = await loadProviders(rootDir, dryRun, config.providers);
-    const store = await loadVariables(rootDir);
+    const store = await loadVariables(rootDir, config.variables);
 
     for (const p of providers) {
       try {
-        if (p.checkInstallation) { p.checkInstallation(); }
+        if (p.checkInstallation) { await p.checkInstallation(); }
       } catch (e) {
-        errorOut(`${p.name} failed when checking its own installation: ${(e as Error).message}`); 
+        errorOut(`${p.name} failed when checking its own installation: ${(e as Error).message}`);
       }
     }
 
@@ -81,25 +105,19 @@ const syncCommand = cli.command("sync")
     }
 
     const list = getPackageList(modules, lockfile);
-    const map: Map<string, PackageInfo[]> = new Map();
+    const map = toProviderMap(list);
 
-    for (const p of list) {
-      if (!map.has(p.provider)) {
-        map.set(p.provider, [p]);
-      } else {
-        const current = map.get(p.provider)!;
-        current.push(p);
-        map.set(p.provider, current);
-      }
-    }
-
-    await syncPackages(map, providers, noRemove);
+    // capture the previously-managed set BEFORE we rewrite the lockfile
+    const managed = managedSet(providers, lockfile);
+    await syncPackages(map, providers, noRemove, managed);
 
     console.log("\nRUNNING EVENTS:");
-    await runEvents(modules);
+    await runEvents(modules, dryRun ? dryShell : defaultShell);
 
-    await updateLockfile(providers, lockfile);
-    lockfile.serializeToFile(lockfilePath);
+    if (!dryRun) {
+      await updateLockfile(map, providers, lockfile);
+      lockfile.serializeToFile(lockfilePath);
+    }
   });
 
 cli.command("update-lockfile")
@@ -107,13 +125,54 @@ cli.command("update-lockfile")
   .action(async () => {
     const rootDir = getRootDir();
     const config = readConfig(rootDir);
+    const modules = await loadModules(rootDir, false, config.modules);
     const providers = await loadProviders(rootDir, false, config.providers);
     const lockfile = new Lockfile();
     const lockfilePath = path.join(rootDir, "sysdef-lock.json");
 
     lockfile.readFromFile(lockfilePath);
 
-    await updateLockfile(providers, lockfile);
+    const map = toProviderMap(getPackageList(modules, lockfile));
+    await updateLockfile(map, providers, lockfile);
+    lockfile.serializeToFile(lockfilePath);
+  });
+
+cli.command("update")
+  .description("Update managed packages to their newest versions")
+  .argument("[provider]", "only update packages for this provider")
+  .argument("[packages...]", "only update these packages (default: all)")
+  .action(async (provider, packages) => {
+    const rootDir = getRootDir();
+    const config = readConfig(rootDir);
+    const modules = await loadModules(rootDir, false, config.modules);
+    let providers = await loadProviders(rootDir, false, config.providers);
+
+    if (provider !== undefined && providers.find(p => p.name === provider) === undefined) {
+      errorOut(`Provider ${provider} was not found.`);
+    }
+    if (provider) {
+      providers = providers.filter(p => p.name === provider);
+    }
+
+    for (const p of providers) {
+      try {
+        if (p.checkInstallation) { await p.checkInstallation(); }
+      } catch (e) {
+        errorOut(`${p.name} failed when checking its own installation: ${(e as Error).message}`);
+      }
+    }
+
+    for (const p of providers) {
+      console.log(`\nUPDATING PACKAGES FOR: ${p.name}`);
+      await p.update(packages ?? []);
+    }
+
+    // refresh the lockfile so managed packages reflect their new versions
+    const lockfilePath = path.join(rootDir, "sysdef-lock.json");
+    const lockfile = new Lockfile();
+    lockfile.readFromFile(lockfilePath);
+    const map = toProviderMap(getPackageList(modules, lockfile));
+    await updateLockfile(map, providers, lockfile);
     lockfile.serializeToFile(lockfilePath);
   });
 
@@ -126,10 +185,10 @@ cli.command("providers")
 
     for (const p of providers) {
       try {
-        if (p.checkInstallation) { p.checkInstallation(); }
+        if (p.checkInstallation) { await p.checkInstallation(); }
         console.log(`${p.name} is installed correctly`);
       } catch (e) {
-        console.log(`${p.name} failed when checking its own installation: ${(e as Error).message}`); 
+        console.log(`${p.name} failed when checking its own installation: ${(e as Error).message}`);
       }
     }
   });

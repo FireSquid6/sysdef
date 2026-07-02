@@ -3,6 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "test": "bun test",
+    "test:e2e": "bun test ./test-e2e/apt.e2e.ts ./test-e2e/bun.e2e.ts ./test-e2e/cargo.e2e.ts ./test-e2e/arch-official.e2e.ts ./test-e2e/aur.e2e.ts ./test-e2e/npm.e2e.ts ./test-e2e/pipx.e2e.ts ./test-e2e/go.e2e.ts ./test-e2e/dnf.e2e.ts ./test-e2e/sysdef-files.e2e.ts ./test-e2e/install-failure.e2e.ts ./test-e2e/managed-set.e2e.ts ./test-e2e/update-command.e2e.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

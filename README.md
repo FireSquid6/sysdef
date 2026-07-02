@@ -6,12 +6,11 @@
  \__ \| |_| |\__ \| |) || _| | _|
  |___/ \__, ||___/|___/ |___||_|
        |___/
-       ⟳ keep systems in sync
 ```
 
-A declarative experience for any package manager.
+A declarative experience for any[^1] package manager.
 
-Sysdef is currently very experimental. Make backups before you use it. Not my fault if you brick your system[^1].
+Sysdef is currently very experimental. Make backups before you use it. Not my fault if you brick your system[^2].
 
 # Installation
 Sysdef does not work like standard programs--it's meant to be as hackable as possible. The typescript codebase is installed directly onto your machine with a [bun](https://bun.sh) installation next to it. You can run:
@@ -33,14 +32,15 @@ The repo contains the following directories:
 
 # To Do
 - [ ] custom packages
-- [ ] events
+- [x] events
 - [ ] auto config generator
-- [ ] e2e test suite with docker
-- [ ] use pacman instead of yay
-- [ ] custom aur provider 
+- [x] e2e test suite with docker
+- [x] use pacman instead of yay
+- [x] custom aur provider
 - [x] docs
 - [ ] pull and update providers with a command
 - [ ] self update command
 
 
-[^1]: Broken systems while developing counter: 2
+[^1]: Out of the box support for apt, arch official, AUR, cargo,
+[^2]: Broken systems while developing counter: 2
