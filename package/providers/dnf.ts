@@ -23,7 +23,7 @@ const provider: ProviderGenerator = (run: Shell) => {
       const specs = packages
         .map(p => (p.version === ANY_VERSION_STRING ? p.name : `${p.name}-${p.version}`))
         .join(" ");
-      const result = await run(`sudo dnf install -y ${specs}`, { throwOnError: true });
+      const result = await run(`dnf install -y ${specs}`, { throwOnError: true, asRoot: true });
       if (result.code !== 0) {
         errorOut(`Failed to install dnf packages: ${specs} (exit code ${result.code})`);
       }
@@ -32,7 +32,7 @@ const provider: ProviderGenerator = (run: Shell) => {
     async uninstall(packages: string[]) {
       if (packages.length === 0) return;
       const specs = packages.join(" ");
-      const result = await run(`sudo dnf remove -y ${specs}`, { throwOnError: true });
+      const result = await run(`dnf remove -y ${specs}`, { throwOnError: true, asRoot: true });
       if (result.code !== 0) {
         errorOut(`Failed to uninstall dnf packages: ${specs} (exit code ${result.code})`);
       }
@@ -59,14 +59,14 @@ const provider: ProviderGenerator = (run: Shell) => {
 
     async update(packages: string[]) {
       if (packages.length === 0) {
-        const result = await run(`sudo dnf upgrade -y`, { throwOnError: true });
+        const result = await run(`dnf upgrade -y`, { throwOnError: true, asRoot: true });
         if (result.code !== 0) {
           errorOut(`Failed to upgrade dnf packages (exit code ${result.code})`);
         }
         return;
       }
       for (const p of packages) {
-        const result = await run(`sudo dnf upgrade -y ${p}`, { throwOnError: true });
+        const result = await run(`dnf upgrade -y ${p}`, { throwOnError: true, asRoot: true });
         if (result.code !== 0) {
           errorOut(`Failed to update dnf package: ${p} (exit code ${result.code})`);
         }

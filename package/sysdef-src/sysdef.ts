@@ -128,10 +128,17 @@ export const defaultShell: Shell = async (s, { throwOnError, stdin, displayOutpu
   })
   
 
-  const cmd = typeof s === "string" ? s.split(" ") : s; 
+  const cmd = typeof s === "string" ? s.split(" ") : s;
 
   if (asRoot === true) {
-    cmd.unshift("sudo");
+    // when getCredentials has set up an askpass helper, use it (-A) so sudo
+    // pulls the password non-interactively; otherwise fall back to a normal
+    // interactive sudo prompt
+    if (process.env.SUDO_ASKPASS !== undefined) {
+      cmd.unshift("sudo", "-A");
+    } else {
+      cmd.unshift("sudo");
+    }
   }
 
   const p = Bun.spawn({

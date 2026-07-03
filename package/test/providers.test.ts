@@ -39,11 +39,12 @@ const pkg = (name: string, version: string, provider: string): PackageInfo => ({
 });
 
 describe("apt provider", () => {
-  test("install builds a single batched `apt install -y` command", async () => {
-    const { shell, cmds } = mockShell();
+  test("install builds a single batched `apt install -y` command as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = aptGen(shell);
     await p.install([pkg("vim", ANY_VERSION_STRING, "apt"), pkg("git", "1:2.39", "apt")]);
-    expect(cmds()).toEqual(["sudo apt install -y vim git=1:2.39"]);
+    expect(cmds()).toEqual(["apt install -y vim git=1:2.39"]);
+    expect(calls[0]!.options.asRoot).toBe(true);
   });
 
   test("install batches in groups of 10", async () => {
@@ -53,30 +54,33 @@ describe("apt provider", () => {
     await p.install(many);
     const calls = cmds();
     expect(calls).toHaveLength(3); // 10 + 10 + 3
-    expect(calls[0]!.split(" ").length).toBe(4 + 10); // "sudo apt install -y" + 10 names
+    expect(calls[0]!.split(" ").length).toBe(3 + 10); // "apt install -y" + 10 names
     expect(calls[2]!).toContain("p20 p21 p22");
   });
 
-  test("uninstall builds `apt remove -y`", async () => {
-    const { shell, cmds } = mockShell();
+  test("uninstall builds `apt remove -y` as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = aptGen(shell);
     await p.uninstall(["vim", "git"]);
-    expect(cmds()).toEqual(["sudo apt remove -y vim git"]);
+    expect(cmds()).toEqual(["apt remove -y vim git"]);
+    expect(calls[0]!.options.asRoot).toBe(true);
   });
 
-  test("update with no packages does a full upgrade (two separate commands)", async () => {
-    const { shell, cmds } = mockShell();
+  test("update with no packages does a full upgrade (two separate commands) as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = aptGen(shell);
     await p.update([]);
     // defaultShell has no shell, so `&&` can't be used -- must be two commands
-    expect(cmds()).toEqual(["sudo apt update", "sudo apt upgrade -y"]);
+    expect(cmds()).toEqual(["apt update", "apt upgrade -y"]);
+    expect(calls.every((c) => c.options.asRoot === true)).toBe(true);
   });
 
-  test("update with packages installs each", async () => {
-    const { shell, cmds } = mockShell();
+  test("update with packages installs each as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = aptGen(shell);
     await p.update(["vim", "git"]);
-    expect(cmds().sort()).toEqual(["sudo apt install -y git", "sudo apt install -y vim"]);
+    expect(cmds().sort()).toEqual(["apt install -y git", "apt install -y vim"]);
+    expect(calls.every((c) => c.options.asRoot === true)).toBe(true);
   });
 
   test("checkInstallation probes with `which apt`", async () => {
@@ -355,32 +359,36 @@ describe("go provider", () => {
 });
 
 describe("dnf provider", () => {
-  test("install batches into one `dnf install -y` with name-version syntax", async () => {
-    const { shell, cmds } = mockShell();
+  test("install batches into one `dnf install -y` with name-version syntax as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = dnfGen(shell);
     await p.install([pkg("sl", ANY_VERSION_STRING, "dnf"), pkg("cowsay", "3.04-1.fc40", "dnf")]);
-    expect(cmds()).toEqual(["sudo dnf install -y sl cowsay-3.04-1.fc40"]);
+    expect(cmds()).toEqual(["dnf install -y sl cowsay-3.04-1.fc40"]);
+    expect(calls[0]!.options.asRoot).toBe(true);
   });
 
-  test("uninstall uses `dnf remove -y`", async () => {
-    const { shell, cmds } = mockShell();
+  test("uninstall uses `dnf remove -y` as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = dnfGen(shell);
     await p.uninstall(["sl", "cowsay"]);
-    expect(cmds()).toEqual(["sudo dnf remove -y sl cowsay"]);
+    expect(cmds()).toEqual(["dnf remove -y sl cowsay"]);
+    expect(calls[0]!.options.asRoot).toBe(true);
   });
 
-  test("update with no packages upgrades everything", async () => {
-    const { shell, cmds } = mockShell();
+  test("update with no packages upgrades everything as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = dnfGen(shell);
     await p.update([]);
-    expect(cmds()).toEqual(["sudo dnf upgrade -y"]);
+    expect(cmds()).toEqual(["dnf upgrade -y"]);
+    expect(calls[0]!.options.asRoot).toBe(true);
   });
 
-  test("update with packages upgrades each", async () => {
-    const { shell, cmds } = mockShell();
+  test("update with packages upgrades each as root", async () => {
+    const { shell, calls, cmds } = mockShell();
     const p = dnfGen(shell);
     await p.update(["sl"]);
-    expect(cmds()).toEqual(["sudo dnf upgrade -y sl"]);
+    expect(cmds()).toEqual(["dnf upgrade -y sl"]);
+    expect(calls[0]!.options.asRoot).toBe(true);
   });
 
   test("checkInstallation probes with `which dnf`", async () => {
