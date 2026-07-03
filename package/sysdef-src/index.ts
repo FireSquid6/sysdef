@@ -1,5 +1,6 @@
 import os from "os";
 import path from "path";
+import fs from "fs";
 import { loadModules, loadProviders, loadVariables } from "./loaders";
 import { Lockfile } from "./lockfile";
 import { dryFilesystem, normalFilesystem } from "./connections";
@@ -46,19 +47,77 @@ const cli = new Command()
 
 
 
+// path to the temporary SUDO_ASKPASS helper, kept so we can clean it up on exit
+let askpassPath: string | null = null;
+
+// read a line from stdin without echoing it to the terminal
+function readPassword(promptText: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stdout.write(promptText);
+
+    // disable terminal echo while the password is typed (canonical mode stays
+    // on, so backspace etc. still work; the terminal just doesn't print keys)
+    Bun.spawnSync(["stty", "-echo"], { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+
+    const decoder = new TextDecoder();
+    let buf = "";
+    const onData = (chunk: Buffer) => {
+      buf += decoder.decode(chunk);
+      const nl = buf.indexOf("\n");
+      if (nl === -1) {
+        return;
+      }
+      process.stdin.off("data", onData);
+      process.stdin.pause();
+      Bun.spawnSync(["stty", "echo"], { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+      process.stdout.write("\n");
+      resolve(buf.slice(0, nl).replace(/\r$/, ""));
+    };
+
+    process.stdin.resume();
+    process.stdin.on("data", onData);
+  });
+}
+
+// remove the askpass helper, wipe the password from our environment, and drop
+// any cached sudo timestamp
+function cleanupCredentials() {
+  if (askpassPath !== null) {
+    try { fs.unlinkSync(askpassPath); } catch { /* best effort */ }
+    askpassPath = null;
+  }
+  delete process.env.SYSDEF_SUDO_PASSWORD;
+  delete process.env.SUDO_ASKPASS;
+  Bun.spawnSync(["sudo", "-k"]);
+}
+
 async function getCredentials() {
+  // already root: no sudo (and no password prompt) needed at all
+  if (process.getuid !== undefined && process.getuid() === 0) {
+    return;
+  }
+
   console.log("Sysdef needs your credentials for commands that require root. These will only be used when necessary.");
 
-  // this will keep the sudo credentials cached so each
-  // successive sudo doesn't require the password
-  const keepAlive = setInterval(async () => {
-    await Bun.spawn(["sudo", "-v"]).exited;
-  }, 4 * 60 * 1000);
+  const password = await readPassword("[sudo] password: ");
 
-  process.on("exit", () => {
-    clearInterval(keepAlive);
-    Bun.spawnSync(["sudo", "-k"]);
-  })
+  // write a helper that echoes the password from the environment. sudo -A runs
+  // this to authenticate, so we prompt once and every later root command reuses
+  // the same in-memory password instead of re-prompting.
+  askpassPath = path.join(os.tmpdir(), `sysdef-askpass-${process.pid}-${Date.now()}.sh`);
+  fs.writeFileSync(askpassPath, `#!/bin/sh\nprintf '%s\\n' "$SYSDEF_SUDO_PASSWORD"\n`, { mode: 0o700 });
+
+  process.env.SUDO_ASKPASS = askpassPath;
+  process.env.SYSDEF_SUDO_PASSWORD = password;
+
+  // validate now so a wrong password fails fast rather than mid-install
+  const check = Bun.spawnSync(["sudo", "-A", "-v"]);
+  if (check.exitCode !== 0) {
+    cleanupCredentials();
+    errorOut("Failed to obtain root credentials");
+  }
+
+  process.on("exit", cleanupCredentials);
 }
 
 const syncCommand = cli.command("sync")
@@ -102,6 +161,10 @@ const syncCommand = cli.command("sync")
 
     if (filesOnly) {
       return;
+    }
+
+    if (!dryRun) {
+      await getCredentials();
     }
 
     const list = getPackageList(modules, lockfile);
@@ -161,6 +224,8 @@ cli.command("update")
         errorOut(`${p.name} failed when checking its own installation: ${(e as Error).message}`);
       }
     }
+
+    await getCredentials();
 
     for (const p of providers) {
       console.log(`\nUPDATING PACKAGES FOR: ${p.name}`);

@@ -56,6 +56,7 @@ There is no linter or typecheck script; rely on `bun test` and `tsc` semantics f
 
 **Side-effect abstractions enable `--dry-run`:**
 - `Shell` type: `defaultShell` (real `Bun.spawn`, supports `asRoot` via sudo) vs `dryShell` (prints "Would run"). Providers receive one of these — never call subprocesses directly.
+- **Running commands as root: always pass `{ asRoot: true }` — never hard-code `sudo` into a command string.** Root commands are authenticated once via a `SUDO_ASKPASS` helper set up by `getCredentials()` (in `index.ts`, called by `sync`/`update`), which prompts for the password a single time and reuses it in-memory. `defaultShell` only adds sudo's `-A` (askpass) flag on the `asRoot` path, so a hard-coded `sudo` bypasses that and can re-prompt for the password repeatedly. `getCredentials()` no-ops when already running as root.
 - `Filesystem` (`connections.ts`): `normalFilesystem`, `dryFilesystem`, `confirmationFilesystem`.
 
 **Conventions specific to this codebase:**
