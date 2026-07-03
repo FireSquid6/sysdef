@@ -159,7 +159,9 @@ export const defaultShell: Shell = async (s, { throwOnError, stdin, displayOutpu
 
 
   let output = "";
-  if (!displayOutput) {
+  // p.stdout is only a readable stream when we piped it (displayOutput false);
+  // with "inherit" it's undefined, hence the guard.
+  if (!displayOutput && p.stdout) {
     const decoder = new TextDecoder("utf-8");
     for await (const chunk of p.stdout) {
       output += decoder.decode(chunk);
@@ -298,11 +300,13 @@ export async function syncPackages(
   providers: Provider[],
   noRemove: boolean,
   managed: Map<string, Set<string>>,
+  explicitlyUntracked: Map<string, Set<string>>,
   confirm: (prompt: string) => Promise<void> = promptForOk,
 ) {
   for (const provider of providers) {
     const packages = allPackages.get(provider.name) ?? [];
     const managedForProvider = managed.get(provider.name) ?? new Set<string>();
+    const untrackedForProvider = explicitlyUntracked.get(provider.name) ?? new Set<string>();
     const toInstall: PackageInfo[] = [];
     const noChange: PackageInfo[] = [];
     const toUninstall: PackageInfo[] = [];
@@ -336,9 +340,11 @@ export async function syncPackages(
     // packages the provider can see but that sysdef doesn't manage (not in the
     // lockfile). For system PMs (arch/apt/dnf) getInstalled() reports the whole
     // OS, so this is expected and often large -- warn with a count, and only
-    // enumerate names when the list is short enough to be useful.
+    // enumerate names when the list is short enough to be useful. Packages the
+    // user has explicitly marked untracked (trackfile) are suppressed entirely.
     const untrackedNames = [...new Set(
-      alreadyInstalledInfos.map(p => p.name).filter(name => !managedForProvider.has(name))
+      alreadyInstalledInfos.map(p => p.name)
+        .filter(name => !managedForProvider.has(name) && !untrackedForProvider.has(name))
     )];
 
     console.log(`\nMANAGING PACKGES FOR: ${provider.name}`);
@@ -351,6 +357,7 @@ export async function syncPackages(
       } else {
         console.log(`  ⚠ ${untrackedNames.length} untracked (installed but not managed by sysdef)`);
       }
+      console.log(`      silence: \`sysdef track ignore-all ${provider.name}\`  |  specific: \`sysdef track ignore ${provider.name} <pkg>\``);
     }
 
     for (const p of toInstall) {
