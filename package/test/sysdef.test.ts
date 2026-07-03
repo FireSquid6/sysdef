@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, spyOn } from "bun:test";
 import { 
   VariableStore, 
   type PackageInfo, 
@@ -373,6 +373,69 @@ describe("syncPackages", () => {
 
     expect(toInstall).toHaveLength(0);
     expect(toUninstall).toHaveLength(0);
+  });
+
+  test("warns and lists untracked packages when the list is short", async () => {
+    const { provider } = recordingProvider([
+      { name: "managed1", version: "1.0.0", provider: "npm" },
+      { name: "ripgrep", version: "1.0.0", provider: "npm" },
+      { name: "bat", version: "1.0.0", provider: "npm" },
+    ]);
+    const requested = new Map([["npm", [{ name: "managed1", version: "1.0.0", provider: "npm" }]]]);
+
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    let out = "";
+    try {
+      await syncPackages(requested, [provider], false, managed("managed1"), noop);
+      out = log.mock.calls.map(c => c.join(" ")).join("\n");
+    } finally {
+      log.mockRestore();
+    }
+
+    // ripgrep + bat are installed but not managed
+    expect(out).toContain("2 untracked");
+    expect(out).toContain("ripgrep, bat");
+    // a managed package must not be reported as untracked
+    expect(out).not.toContain("managed1,");
+  });
+
+  test("warns with a count only when there are many untracked packages", async () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      name: `pkg${i}`, version: "1.0.0", provider: "npm",
+    }));
+    const { provider } = recordingProvider(many);
+    const requested = new Map([["npm", []]]);
+
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    let out = "";
+    try {
+      await syncPackages(requested, [provider], false, managed(), noop);
+      out = log.mock.calls.map(c => c.join(" ")).join("\n");
+    } finally {
+      log.mockRestore();
+    }
+
+    expect(out).toContain("20 untracked");
+    // over the threshold -> names are not enumerated
+    expect(out).not.toContain("pkg0, pkg1");
+  });
+
+  test("does not warn when every installed package is managed", async () => {
+    const { provider } = recordingProvider([
+      { name: "package1", version: "1.0.0", provider: "npm" },
+    ]);
+    const requested = new Map([["npm", [{ name: "package1", version: "1.0.0", provider: "npm" }]]]);
+
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    let out = "";
+    try {
+      await syncPackages(requested, [provider], false, managed("package1"), noop);
+      out = log.mock.calls.map(c => c.join(" ")).join("\n");
+    } finally {
+      log.mockRestore();
+    }
+
+    expect(out).not.toContain("untracked");
   });
 });
 
