@@ -33,3 +33,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 
+# per-machine trackfile (explicitly-untracked packages vary by system)
+sysdef-track.json
+
