@@ -25,6 +25,7 @@ Sysdef uses a root directory (defaults to `$HOME/sysdef` or can be set via `SYSD
   - *.ts (provider definitions)
 - config.yaml
 - sysdef-lock.json (auto-generated)
+- sysdef-track.json (auto-generated)
 </FileTree>
 
 ## Available Commands
@@ -79,6 +80,56 @@ sysdef update npm
 
 # Update specific packages
 sysdef update npm typescript left-pad
+```
+
+### `sysdef update-lockfile`
+
+Snapshots the versions currently installed on your system into `sysdef-lock.json`
+**without** installing, removing, or changing anything. This is bookkeeping-only: it
+re-pins each managed package to the version that's actually present.
+
+Use it when packages changed out-of-band (for example, you upgraded something with your
+package manager directly) and you want the lockfile to reflect reality without running a
+full `sync`.
+
+```bash
+sysdef update-lockfile
+```
+
+### `sysdef track [subcommand]`
+
+Manages which installed-but-unmanaged packages sysdef warns about. During `sync`, system
+providers (`arch-official`, `apt`, `dnf`) report **every** package on the machine through
+`getInstalled()`, so sysdef prints a warning listing packages that are installed but not
+declared in any module (it never removes these — sysdef only removes packages it installed
+itself and recorded in the lockfile). The trackfile (`sysdef-track.json`) lets you silence
+that warning for packages you don't intend to manage. It is stored separately from the
+lockfile because it varies per machine (keep the lockfile committed, the trackfile
+gitignored).
+
+Running `sysdef track` with no subcommand prints help. Subcommands:
+
+- **`sysdef track ignore <provider> [packages...]`** — mark specific packages untracked so
+  `sync` stops warning about them.
+- **`sysdef track ignore-all [provider]`** — mark *every* currently installed-but-unmanaged
+  package untracked (for one provider, or all if omitted). Handy for the first sync on an
+  existing system.
+- **`sysdef track unignore <provider> [packages...]`** — remove packages from the untracked
+  list, re-enabling the warning.
+- **`sysdef track list [provider]`** — show which packages are currently marked untracked.
+
+Note: adding a package to a module (so it becomes *managed*) automatically drops it from the
+untracked list on the next sync.
+
+```bash
+# Stop warning about base-system packages you'll never manage with sysdef
+sysdef track ignore-all arch-official
+
+# Silence just a couple of packages
+sysdef track ignore apt vim curl
+
+# See what's currently ignored
+sysdef track list
 ```
 
 ### `sysdef providers`
@@ -142,5 +193,6 @@ The CLI loads configuration from:
 3. **Provider files**: TypeScript files in the `providers/` directory  
 4. **Variables file**: Optional `variables.{ts,js,tsx,jsx}` for global variables
 5. **Lockfile**: `sysdef-lock.json` for tracking exact package versions
+6. **Trackfile**: `sysdef-track.json` for packages you've marked untracked (see `sysdef track`)
 
 All TypeScript/JavaScript files are dynamically imported and must export a default function that returns the appropriate object (Module, Provider, or variables record).

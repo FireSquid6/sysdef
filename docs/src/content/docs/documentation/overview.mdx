@@ -21,10 +21,12 @@ Sysdef is a hackable system declaration manager written and configured in [Types
   - ... (other modules you can make)
 - providers/
 - config.yaml
+- sysdef-lock.json (auto-generated)
+- sysdef-track.json (auto-generated)
 </FileTree>
 
 
-Each [Module](/guides/modules) is a set of directories, files, and packages you want installed, created, and managed on your machine. You also have [Providers](/guides/providers) which provide an interface for interacting with a package manager. Some default providers for the package managers `apt`, `arch-official`, `aur`, `dnf`, `bun`, `npm`, `pipx`, `go`, and `cargo` are included. It's expected that you have the ones you use installed already.
+Each [Module](/documentation/modules) is a set of directories, files, and packages you want installed, created, and managed on your machine. You also have [Providers](/documentation/providers) which provide an interface for interacting with a package manager. Some default providers for the package managers `apt`, `arch-official`, `aur`, `dnf`, `bun`, `npm`, `pipx`, `go`, and `cargo` are included (plus a `custom` stub for your own logic). It's expected that you have the ones you use installed already.
 
 The source code for sysdef is stored locally and is very small (~1500 LOC). It's copied directly into `sysdef-src` and built to be simple and hackable. In the `bin` directory is a local installation of bun (an alternative of node used to run typescript code) alongside a `sysdef` executable. You should probably add that `bin` directory to your path. 
 
@@ -34,7 +36,7 @@ Nothing in the docs will dive too deep into how sysdef works--that can be read f
 
 
 # Config File
-The `config.yaml` file contains two lists: the list of all modules, and the list of all providers. You could put the `config.yaml` in your gitignore so that a different one is created for each machine. It also has a list of variables commonly used for the home directory or username.
+The `config.yaml` file contains two lists: the list of all modules, and the list of all providers. You could put the `config.yaml` in your gitignore so that a different one is created for each machine. It also has a map of variables commonly used for the home directory or username.
 
 ```yaml
 providers:
@@ -43,9 +45,9 @@ providers:
 modules:
   - example
 # these variables cascade--if any are redefined elsewhere, the deepest
-# variation is used 
+# variation is used. `variables` is a map (key: value), not a list.
 variables:
-  - HOMEDIR: /home/firesquid
+  HOMEDIR: /home/firesquid
 ```
 
 # Variables
@@ -62,7 +64,7 @@ Variables can be used in the definition of file paths and file contents. For exa
       // contents of the file
       //
       // this can use variables as well--useful for per machine differences
-      "{HOMEDIR}/": (variables) => {
+      "{HOMEDIR}/generated-example.txt": (variables) => {
         return `The home directory is: ${variables.get("HOMEDIR")}`
       },
     },

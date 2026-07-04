@@ -74,7 +74,8 @@ const generator: ProviderGenerator = (shell) => {
     },
     
     async checkInstallation() {
-      await shell("which example-pm", { throwOnError: false });
+      // throwOnError defaults to true, so this throws if example-pm isn't found
+      await shell("which example-pm", {});
     }
   };
 };
@@ -118,12 +119,13 @@ Should throw an error if the package manager is not available or misconfigured.
 Providers receive a `Shell` function that provides a consistent interface for executing commands:
 
 ```ts
-type Shell = (s: string, options: ShellOptions) => Promise<ShellResult>;
+type Shell = (s: string | string[], options: ShellOptions) => Promise<ShellResult>;
 
 interface ShellOptions {
   throwOnError?: boolean;    // Default: true - throw on non-zero exit
   stdin?: string;           // Input to pipe to the command
   displayOutput?: boolean;  // Show output in real-time
+  asRoot?: boolean;         // Run the command as root (via sudo) - see below
 }
 
 interface ShellResult {
@@ -131,6 +133,28 @@ interface ShellResult {
   stdout: string;   // Standard output
 }
 ```
+
+The command can be either a **string** (split on spaces) or a **string array**. Use the
+array form when an argument contains spaces that must not be split — for example the `dnf`
+provider passes `["rpm", "-qa", "--qf", "%{NAME} %{VERSION}-%{RELEASE}\n"]` so the format
+string stays a single argument.
+
+### Running commands as root
+
+Never hard-code `sudo` into a command string. Instead pass `{ asRoot: true }`:
+
+```ts
+// correct
+await shell(["pacman", "-S", "--noconfirm", ...names], { asRoot: true, displayOutput: true });
+
+// wrong - re-prompts for the password and bypasses sysdef's askpass helper
+await shell("sudo pacman -S --noconfirm ...", { displayOutput: true });
+```
+
+`sysdef sync` (and `sysdef update`) prompt for the sudo password **once** at the start and
+reuse it in-memory for every `asRoot` command via a `SUDO_ASKPASS` helper. A hard-coded
+`sudo` bypasses that and can re-prompt repeatedly. See `providers/apt.ts` and
+`providers/arch-official.ts` for reference implementations.
 
 The shell function handles:
 - **Dry-run mode**: When `--dry-run` is used, providers get `dryShell` which only logs commands
@@ -147,8 +171,9 @@ await shell("apt update", { displayOutput: true });
 const result = await shell("apt list --installed", {});
 const packages = parseAptOutput(result.stdout);
 
-// Non-failing command (for checking if tool exists)
-const check = await shell("which pacman", { throwOnError: true });
+// Non-failing command (for checking if tool exists): pass throwOnError: false
+// so a non-zero exit is returned instead of thrown, then inspect the code
+const check = await shell("which pacman", { throwOnError: false });
 if (check.code !== 0) {
   throw new Error("pacman not found in PATH");
 }

@@ -28,12 +28,15 @@ Usage: sysdef [options] [command]
 The hackable computer configuration system
 
 Options:
-  -h, --help                 display help for command
+  -h, --help                          display help for command
 
 Commands:
-  sync [options]             Sync all packages, modules, and files
-  providers                  Subcommand to list all of the installed providers
-  list-installed [provider]  list the installed packages from an optional provider
+  sync [options]                      Sync all packages, modules, and files
+  update-lockfile                     Update the lockfile to the current system state
+  update [provider] [packages...]     Update managed packages to their newest versions
+  providers                           Subcommand to list all of the installed providers
+  list-installed [provider]           list the installed packages from an optional provider
+  track                               Manage which installed packages sysdef warns about as untracked
   hello
 
 ```
