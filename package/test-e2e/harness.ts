@@ -68,7 +68,7 @@ export class SysdefContainer {
   private id: string | null = null;
   private tmp: string;
 
-  constructor(private image: string, private label: string) {
+  constructor(private image: string, private label: string, private opts: { systemd?: boolean } = {}) {
     this.tmp = fs.mkdtempSync(path.join(os.tmpdir(), `sysdef-e2e-${label}-`));
   }
 
@@ -76,13 +76,32 @@ export class SysdefContainer {
     // Keep the container alive; we drive it with `docker exec`.
     // Mount the real package dir read-only, then copy it to a writable /sysdef
     // so the lockfile can be written just like a real install.
-    const res = run([
+    const args = [
       "docker", "run", "-d",
       "--name", this.containerName(),
       "-v", `${PACKAGE_DIR}:/src:ro`,
-      this.image,
-      "sleep", "infinity",
-    ]);
+    ];
+    if (this.opts.systemd) {
+      // Boot real systemd as PID 1. On cgroup v2, --privileged alone gives the
+      // container its OWN private, delegated cgroup subtree (default cgroup
+      // namespace = private), so its systemd stays confined to the container.
+      //
+      // DO NOT add `--cgroupns=host` or bind-mount the host's /sys/fs/cgroup rw:
+      // that puts the container's systemd in the HOST cgroup namespace, where it
+      // can tear down cgroups belonging to the host's own systemd/logind and
+      // kill the user's live graphical session on container shutdown.
+      args.push(
+        "--privileged",
+        "--tmpfs", "/run",
+        "--tmpfs", "/run/lock",
+        this.image,
+        "/sbin/init",
+      );
+    } else {
+      args.push(this.image, "sleep", "infinity");
+    }
+
+    const res = run(args);
     if (res.code !== 0) {
       throw new Error(`Failed to start container: ${res.stderr || res.stdout}`);
     }
@@ -96,6 +115,25 @@ export class SysdefContainer {
     if (setup.code !== 0) {
       throw new Error(`Failed to lay down /sysdef: ${setup.stderr || setup.stdout}`);
     }
+
+    if (this.opts.systemd) {
+      this.waitForSystemd();
+    }
+  }
+
+  /** Poll `systemctl is-system-running` until systemd finishes booting. */
+  private waitForSystemd(): void {
+    for (let i = 0; i < 60; i++) {
+      const state = this.exec("systemctl is-system-running").stdout.trim();
+      // "running"/"degraded"/"maintenance" all mean boot has settled; only
+      // "initializing"/"starting" (or empty, before the manager answers) mean
+      // we should keep waiting. Degraded is expected (some units are masked).
+      if (state && state !== "initializing" && state !== "starting") {
+        return;
+      }
+      Bun.sleepSync(1000);
+    }
+    throw new Error("systemd did not finish booting in the container");
   }
 
   private containerName(): string {
@@ -199,6 +237,30 @@ const m: ModuleGenerator = () => ({
   directories: {},
   packages: {
     ${JSON.stringify(provider)}: ${JSON.stringify(packages)},
+  },
+});
+
+export default m;
+`;
+}
+
+/** Convenience: a config that activates a single service provider + module. */
+export function serviceConfig(serviceProvider: string, moduleName: string): string {
+  return `providers: []\nserviceProviders:\n  - ${serviceProvider}\nmodules:\n  - ${moduleName}\nvariables: {}\n`;
+}
+
+/** Convenience: build a module .ts that only declares services for one provider. */
+export function servicesModule(name: string, provider: string, services: string[]): string {
+  return `import type { ModuleGenerator } from "../sysdef-src/sysdef";
+
+const m: ModuleGenerator = () => ({
+  name: ${JSON.stringify(name)},
+  variables: {},
+  files: {},
+  directories: {},
+  packages: {},
+  services: {
+    ${JSON.stringify(provider)}: ${JSON.stringify(services)},
   },
 });
 

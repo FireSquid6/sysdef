@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { loadVariables, loadModules, loadProviders } from "../sysdef-src/loaders";
+import { loadVariables, loadModules, loadProviders, loadServiceProviders } from "../sysdef-src/loaders";
 
 describe("loadVariables", () => {
   let dir: string;
@@ -83,5 +83,20 @@ describe("loadProviders", () => {
   test("loads no providers when the list is empty", async () => {
     const providers = await loadProviders(rootDir, true, []);
     expect(providers).toEqual([]);
+  });
+});
+
+describe("loadServiceProviders", () => {
+  // The real serviceProviders/ dir ships with the package.
+  const rootDir = path.resolve(import.meta.dir, "..");
+
+  test("loads the systemd service provider by name", async () => {
+    const serviceProviders = await loadServiceProviders(rootDir, true, ["systemd"]);
+    expect(serviceProviders.map((p) => p.name)).toEqual(["systemd"]);
+  });
+
+  test("loads nothing when the list is empty (dir need not exist)", async () => {
+    const serviceProviders = await loadServiceProviders(rootDir, true, []);
+    expect(serviceProviders).toEqual([]);
   });
 });

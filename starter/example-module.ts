@@ -29,7 +29,12 @@ const m: ModuleGenerator = () => {
         // force typescript version 5.9.3
         "typescript:5.9.3",
       ],
-    }
+    },
+    // services to enable, per service provider. Requires the matching backend
+    // (e.g. "systemd") to be listed under serviceProviders in config.yaml.
+    // services: {
+    //   "systemd": ["sshd", "docker"],
+    // },
   }
 
 }

@@ -9,6 +9,7 @@ import path from "path";
 
 const SRC = path.resolve(import.meta.dir, "..", "sysdef-src");
 const PROVIDERS = path.resolve(import.meta.dir, "..", "providers");
+const SERVICE_PROVIDERS = path.resolve(import.meta.dir, "..", "serviceProviders");
 
 let dir: string;
 beforeEach(() => {
@@ -232,5 +233,31 @@ describe("provider uninstall / update failure paths", () => {
     expect(result.code).toBe(1);
     expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
     expect(result.stdout).toContain("Failed to update");
+  });
+});
+
+describe("systemd service provider failure paths", () => {
+  // enable()/disable() fail fast (errorOut -> exit 1) with a clean message when
+  // systemctl returns non-zero, rather than swallowing the failure.
+  const opScript = (call: string) => `
+    import gen from ${JSON.stringify(path.join(SERVICE_PROVIDERS, "systemd.ts"))};
+    const failingShell = async () => ({ code: 1, stdout: "boom" });
+    const p = gen(failingShell);
+    await p.${call};
+    console.log("SHOULD_NOT_REACH");
+  `;
+
+  test("enable failure exits(1) with a clean message", () => {
+    const result = runScript(opScript(`enable(["does-not-exist"])`));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to enable");
+  });
+
+  test("disable failure exits(1) with a clean message", () => {
+    const result = runScript(opScript(`disable(["does-not-exist"])`));
+    expect(result.code).toBe(1);
+    expect(result.stdout).not.toContain("SHOULD_NOT_REACH");
+    expect(result.stdout).toContain("Failed to disable");
   });
 });

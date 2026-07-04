@@ -44,4 +44,28 @@ variables: {}
     expect(config.modules).toEqual([]);
     expect(config.variables).toEqual({});
   });
+
+  test("parses a config without a serviceProviders key (optional)", () => {
+    writeConfig(`
+providers:
+  - apt
+modules:
+  - core
+variables: {}
+`);
+    const config = readConfig(dir);
+    expect(config.serviceProviders).toBeUndefined();
+  });
+
+  test("parses a serviceProviders list when present", () => {
+    writeConfig(`
+providers: []
+serviceProviders:
+  - systemd
+modules: []
+variables: {}
+`);
+    const config = readConfig(dir);
+    expect(config.serviceProviders).toEqual(["systemd"]);
+  });
 });

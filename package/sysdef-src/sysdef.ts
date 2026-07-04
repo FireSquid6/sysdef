@@ -1,6 +1,7 @@
 import path from "path";
 import type { Filesystem } from "./connections";
 import type { Lockfile } from "./lockfile";
+import type { Trackfile } from "./trackfile";
 import { PackageSet } from "./package-set";
 import { promptForOk } from "./prompt";
 
@@ -200,6 +201,18 @@ export interface Provider {
   checkInstallation?: () => Promise<void>;
 }
 
+// A service backend (systemd, etc.). The services analogue of `Provider`.
+// Services are versionless, so this is simpler than Provider: a service is
+// either enabled or not. Which services sysdef has enabled is per-machine state
+// tracked in the trackfile (NOT the shared lockfile).
+export interface ServiceProvider {
+  readonly name: string;
+  enable: (services: string[]) => Promise<void>;
+  disable: (services: string[]) => Promise<void>;
+  getEnabled: () => Promise<string[]>;
+  checkInstallation?: () => Promise<void>;
+}
+
 
 // when just a string, the file treats it as a filepath in the `dotfiles` directory. Otherwise,
 // the function that generates a string is treated as something that will return what should be 
@@ -217,10 +230,15 @@ export interface Module {
   readonly directories: Record<string, string>;
   readonly files: Record<string, File>;
 
+  // serviceProviderName -> service names that should be enabled. Optional so
+  // existing modules that predate services stay valid.
+  readonly services?: Record<string, string[]>;
+
   readonly onEverySync?: (s: Shell) => Promise<void>;
 }
 
 export type ProviderGenerator = (run: Shell) => Provider;
+export type ServiceProviderGenerator = (run: Shell) => ServiceProvider;
 export type ModuleGenerator = (run: Shell) => Module;
 export type VariablesGenerator = () => Record<string, string>;
 
@@ -413,6 +431,115 @@ export async function updateLockfile(
       const version = installedVersions.get(p.name) ?? p.version;
       lockfile.setVersion(provider.name, p.name, version);
     }
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Services
+//
+// The services analogue of the package pipeline. Services are versionless, so
+// there is no version resolution or conflict checking: a module just lists the
+// service names it wants enabled per service-provider. Which services sysdef
+// itself enabled is per-machine state kept in the trackfile.
+// ---------------------------------------------------------------------------
+
+// Flatten every module's `services` into a serviceProvider -> service names map,
+// deduping names requested by more than one module.
+export function getServiceMap(modules: Module[]): Map<string, string[]> {
+  const map: Map<string, Set<string>> = new Map();
+
+  for (const mod of modules) {
+    for (const [provider, services] of Object.entries(mod.services ?? {})) {
+      let set = map.get(provider);
+      if (!set) {
+        set = new Set<string>();
+        map.set(provider, set);
+      }
+      for (const s of services) {
+        set.add(s);
+      }
+    }
+  }
+
+  return new Map([...map].map(([provider, set]) => [provider, [...set]]));
+}
+
+// Mirrors syncPackages. `managed` is the set of services sysdef previously
+// enabled (from the trackfile) -- sysdef only disables those. `noDisable`
+// (--safe) skips all disabling.
+export async function syncServices(
+  requested: Map<string, string[]>,
+  serviceProviders: ServiceProvider[],
+  noDisable: boolean,
+  managed: Map<string, Set<string>>,
+  explicitlyUntracked: Map<string, Set<string>>,
+  confirm: (prompt: string) => Promise<void> = promptForOk,
+) {
+  for (const provider of serviceProviders) {
+    const wanted = requested.get(provider.name) ?? [];
+    const managedForProvider = managed.get(provider.name) ?? new Set<string>();
+    const untrackedForProvider = explicitlyUntracked.get(provider.name) ?? new Set<string>();
+
+    const enabled = await provider.getEnabled();
+    const enabledSet = new Set(enabled);
+    const wantedSet = new Set(wanted);
+
+    const toEnable = wanted.filter(s => !enabledSet.has(s));
+    // Only disable services sysdef itself enabled (managed) that are no longer
+    // requested. Services enabled by other means are never touched.
+    const toDisable = enabled.filter(s => managedForProvider.has(s) && !wantedSet.has(s));
+
+    // Services that are enabled but sysdef doesn't manage (and the user hasn't
+    // explicitly marked untracked). Warned like untracked packages.
+    const untrackedNames = [...new Set(
+      enabled.filter(s => !managedForProvider.has(s) && !untrackedForProvider.has(s))
+    )];
+
+    console.log(`\nMANAGING SERVICES FOR: ${provider.name}`);
+    console.log(`  OK: ${wanted.length - toEnable.length} services`);
+
+    if (untrackedNames.length > 0) {
+      if (untrackedNames.length <= UNTRACKED_LIST_THRESHOLD) {
+        console.log(`  ⚠ ${untrackedNames.length} untracked (enabled but not managed by sysdef):`);
+        console.log(`      ${untrackedNames.join(", ")}`);
+      } else {
+        console.log(`  ⚠ ${untrackedNames.length} untracked (enabled but not managed by sysdef)`);
+      }
+      console.log(`      silence: \`sysdef track ignore-all ${provider.name}\`  |  specific: \`sysdef track ignore ${provider.name} <service>\``);
+    }
+
+    for (const s of toEnable) {
+      console.log(`  ENABLING: ${s}`);
+    }
+    if (!noDisable) {
+      for (const s of toDisable) {
+        console.log(`  DISABLING: ${s}`);
+      }
+    }
+    if (toEnable.length > 0 || (!noDisable && toDisable.length > 0)) {
+      await confirm("The above operations will be performed. Is this ok?");
+    }
+
+    if (toEnable.length > 0) {
+      await provider.enable(toEnable);
+    }
+    if (!noDisable && toDisable.length > 0) {
+      await provider.disable(toDisable);
+    }
+  }
+}
+
+// Mirrors updateLockfile but writes to the trackfile: after a sync each service
+// provider's managed set becomes exactly the requested services (no-longer
+// requested services were disabled during sync).
+export async function updateServiceTracking(
+  requested: Map<string, string[]>,
+  serviceProviders: ServiceProvider[],
+  trackfile: Trackfile,
+) {
+  for (const provider of serviceProviders) {
+    trackfile.setEnabledServices(provider.name, requested.get(provider.name) ?? []);
   }
 }
 

@@ -7,6 +7,8 @@ import { errorOut, getErrorMessage } from "./sysdef";
 
 const configSchema = v.obj({
   providers: v.array(v.string()),
+  // optional so configs written before services still validate
+  serviceProviders: v.optional(v.array(v.string())),
   modules: v.array(v.string()),
   variables: v.record(v.string(), v.string()),
 });

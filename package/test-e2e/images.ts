@@ -17,6 +17,7 @@ export const IMAGES = {
   python: "sysdef-e2e-python",
   go: "sysdef-e2e-go",
   fedora: "sysdef-e2e-fedora",
+  systemd: "sysdef-e2e-systemd",
 } as const;
 
 const built = new Set<string>();
@@ -63,4 +64,9 @@ export function goImage(): string {
 /** Fedora + dnf + bun. Used for the dnf provider. */
 export function fedoraImage(): string {
   return ensure(IMAGES.fedora, "fedora.Dockerfile");
+}
+
+/** Debian + systemd (as PID 1) + bun. Used for the systemd service provider. */
+export function systemdImage(): string {
+  return ensure(IMAGES.systemd, "systemd.Dockerfile");
 }

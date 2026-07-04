@@ -1,11 +1,11 @@
 import os from "os";
 import path from "path";
 import fs from "fs";
-import { loadModules, loadProviders, loadVariables } from "./loaders";
+import { loadModules, loadProviders, loadServiceProviders, loadVariables } from "./loaders";
 import { Lockfile } from "./lockfile";
 import { Trackfile } from "./trackfile";
 import { dryFilesystem, normalFilesystem } from "./connections";
-import { syncPackages, runEvents, updateLockfile, syncFiles, getPackageList, type PackageInfo, errorOut, defaultShell, dryShell } from "./sysdef";
+import { syncPackages, syncServices, runEvents, updateLockfile, updateServiceTracking, syncFiles, getPackageList, getServiceMap, type PackageInfo, errorOut, defaultShell, dryShell } from "./sysdef";
 import { Command } from "@commander-js/extra-typings";
 import { readConfig } from "./configuration";
 
@@ -46,6 +46,18 @@ function untrackedSet(providers: { name: string }[], trackfile: Trackfile): Map<
     untracked.set(p.name, new Set(trackfile.getUntracked(p.name)));
   }
   return untracked;
+}
+
+// the set of services sysdef currently manages (recorded in the trackfile), per
+// service provider. sysdef only disables services in this set. The services
+// analogue of managedSet -- but sourced from the trackfile, since which services
+// are enabled is per-machine state.
+function managedServicesSet(serviceProviders: { name: string }[], trackfile: Trackfile): Map<string, Set<string>> {
+  const managed: Map<string, Set<string>> = new Map();
+  for (const p of serviceProviders) {
+    managed.set(p.name, new Set(trackfile.getEnabledServices(p.name)));
+  }
+  return managed;
 }
 
 
@@ -152,9 +164,10 @@ const syncCommand = cli.command("sync")
 
     const modules = await loadModules(rootDir, dryRun, config.modules);
     const providers = await loadProviders(rootDir, dryRun, config.providers);
+    const serviceProviders = await loadServiceProviders(rootDir, dryRun, config.serviceProviders ?? []);
     const store = await loadVariables(rootDir, config.variables);
 
-    for (const p of providers) {
+    for (const p of [...providers, ...serviceProviders]) {
       try {
         if (p.checkInstallation) { await p.checkInstallation(); }
       } catch (e) {
@@ -185,23 +198,36 @@ const syncCommand = cli.command("sync")
 
     const list = getPackageList(modules, lockfile);
     const map = toProviderMap(list);
+    const serviceMap = getServiceMap(modules);
 
-    // a package the user now requests (has in a module) should be tracked, so
-    // drop it from the explicitly-untracked list if it was there.
+    // a package/service the user now requests (has in a module) should be
+    // tracked, so drop it from the explicitly-untracked list if it was there.
     for (const p of list) {
       trackfile.removeUntracked(p.provider, p.name);
     }
+    for (const [provider, services] of serviceMap) {
+      for (const s of services) {
+        trackfile.removeUntracked(provider, s);
+      }
+    }
 
-    // capture the previously-managed set BEFORE we rewrite the lockfile
+    // capture the previously-managed sets BEFORE we rewrite the lock/trackfile
     const managed = managedSet(providers, lockfile);
     const explicitlyUntracked = untrackedSet(providers, trackfile);
+    const managedServices = managedServicesSet(serviceProviders, trackfile);
+    const untrackedServices = untrackedSet(serviceProviders, trackfile);
+
     await syncPackages(map, providers, noRemove, managed, explicitlyUntracked);
+    // services after packages: installing packages may lay down the unit files
+    // the services reference.
+    await syncServices(serviceMap, serviceProviders, noRemove, managedServices, untrackedServices);
 
     console.log("\nRUNNING EVENTS:");
     await runEvents(modules, dryRun ? dryShell : defaultShell);
 
     if (!dryRun) {
       await updateLockfile(map, providers, lockfile);
+      await updateServiceTracking(serviceMap, serviceProviders, trackfile);
       lockfile.serializeToFile(lockfilePath);
       trackfile.serializeToFile(trackfilePath);
     }
@@ -320,12 +346,14 @@ trackCommand.command("ignore")
     const rootDir = getRootDir();
     const config = readConfig(rootDir);
     const providers = await loadProviders(rootDir, false, config.providers);
+    const serviceProviders = await loadServiceProviders(rootDir, false, config.serviceProviders ?? []);
+    const knownProviders = new Set([...providers, ...serviceProviders].map(p => p.name));
 
-    if (providers.find(p => p.name === provider) === undefined) {
+    if (!knownProviders.has(provider)) {
       errorOut(`Provider ${provider} was not found.`);
     }
     if (!packages || packages.length === 0) {
-      errorOut("No packages given. Use `sysdef track ignore-all` to untrack everything for a provider.");
+      errorOut("No names given. Use `sysdef track ignore-all` to untrack everything for a provider.");
     }
 
     const trackfilePath = path.join(rootDir, "sysdef-track.json");
@@ -336,22 +364,25 @@ trackCommand.command("ignore")
       trackfile.addUntracked(provider, name);
     }
     trackfile.serializeToFile(trackfilePath);
-    console.log(`Marked ${packages.length} package(s) untracked for ${provider}.`);
+    console.log(`Marked ${packages.length} name(s) untracked for ${provider}.`);
   });
 
 trackCommand.command("ignore-all")
-  .description("Mark every currently installed-but-unmanaged package untracked")
+  .description("Mark every currently installed/enabled-but-unmanaged package or service untracked")
   .argument("[provider]", "only this provider (default: all)")
   .action(async (provider) => {
     const rootDir = getRootDir();
     const config = readConfig(rootDir);
     let providers = await loadProviders(rootDir, false, config.providers);
+    let serviceProviders = await loadServiceProviders(rootDir, false, config.serviceProviders ?? []);
 
-    if (provider !== undefined && providers.find(p => p.name === provider) === undefined) {
+    const knownProviders = new Set([...providers, ...serviceProviders].map(p => p.name));
+    if (provider !== undefined && !knownProviders.has(provider)) {
       errorOut(`Provider ${provider} was not found.`);
     }
     if (provider) {
       providers = providers.filter(p => p.name === provider);
+      serviceProviders = serviceProviders.filter(p => p.name === provider);
     }
 
     const lockfilePath = path.join(rootDir, "sysdef-lock.json");
@@ -374,6 +405,18 @@ trackCommand.command("ignore-all")
       }
       console.log(`${p.name}: marked ${added} package(s) untracked.`);
     }
+    for (const p of serviceProviders) {
+      const managed = new Set(trackfile.getEnabledServices(p.name));
+      const enabled = await p.getEnabled();
+      let added = 0;
+      for (const service of enabled) {
+        if (!managed.has(service) && !trackfile.isUntracked(p.name, service)) {
+          trackfile.addUntracked(p.name, service);
+          added++;
+        }
+      }
+      console.log(`${p.name}: marked ${added} service(s) untracked.`);
+    }
     trackfile.serializeToFile(trackfilePath);
   });
 
@@ -385,12 +428,14 @@ trackCommand.command("unignore")
     const rootDir = getRootDir();
     const config = readConfig(rootDir);
     const providers = await loadProviders(rootDir, false, config.providers);
+    const serviceProviders = await loadServiceProviders(rootDir, false, config.serviceProviders ?? []);
+    const knownProviders = new Set([...providers, ...serviceProviders].map(p => p.name));
 
-    if (providers.find(p => p.name === provider) === undefined) {
+    if (!knownProviders.has(provider)) {
       errorOut(`Provider ${provider} was not found.`);
     }
     if (!packages || packages.length === 0) {
-      errorOut("No packages given.");
+      errorOut("No names given.");
     }
 
     const trackfilePath = path.join(rootDir, "sysdef-track.json");
@@ -401,7 +446,7 @@ trackCommand.command("unignore")
       trackfile.removeUntracked(provider, name);
     }
     trackfile.serializeToFile(trackfilePath);
-    console.log(`Removed ${packages.length} package(s) from untracked for ${provider}.`);
+    console.log(`Removed ${packages.length} name(s) from untracked for ${provider}.`);
   });
 
 trackCommand.command("list")

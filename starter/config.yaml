@@ -1,9 +1,12 @@
 # put all the providers to laod here
 providers:
   - bun
+# service backends to load. Add "systemd" (and list services in a module) to let
+# sysdef enable/disable systemd units. Left empty by default.
+serviceProviders: []
 # all modules can go here
 modules:
   - example
 # these variables cascade--if any are redefined elsewhere, the deepest
-# variation is used 
+# variation is used
 variables:

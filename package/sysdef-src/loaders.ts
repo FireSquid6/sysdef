@@ -1,4 +1,4 @@
-import { type Module, type ProviderGenerator, type Provider, dryShell, defaultShell, type ModuleGenerator, VariableStore, type VariablesGenerator, errorOut } from "./sysdef";
+import { type Module, type ProviderGenerator, type Provider, type ServiceProviderGenerator, type ServiceProvider, dryShell, defaultShell, type ModuleGenerator, VariableStore, type VariablesGenerator, errorOut } from "./sysdef";
 import path from "path";
 import fs from "fs";
 
@@ -89,6 +89,55 @@ export async function loadProviders(rootDir: string, dryRun: boolean, providersL
   }
 
   return providers;
+}
+
+export async function loadServiceProviders(rootDir: string, dryRun: boolean, serviceProvidersList: string[]): Promise<ServiceProvider[]> {
+  const serviceProviders: ServiceProvider[] = [];
+  const serviceProvidersDirectory = path.join(rootDir, "serviceProviders");
+  console.log(`\nLOADING SERVICE PROVIDERS FROM ${serviceProvidersDirectory}`);
+  const toLoad = new Set(serviceProvidersList);
+
+  const shell = dryRun ? dryShell : defaultShell;
+
+  // No service providers requested -- nothing to load (and the directory may not
+  // even exist on older installs).
+  if (toLoad.size === 0) {
+    return serviceProviders;
+  }
+
+  if (!fs.existsSync(serviceProvidersDirectory)) {
+    errorOut(`No serviceProviders directory in ${rootDir}`);
+  }
+
+  for (const fp of fs.readdirSync(serviceProvidersDirectory)) {
+    const filepath = path.join(serviceProvidersDirectory, fp);
+    const extension = path.extname(filepath);
+    const basename = path.basename(filepath).split(".")[0]!;
+    if (!validExtensions.has(extension)) {
+      console.log(`Skipping ${fp}, not a valid extension`);
+      continue;
+    }
+    if (!toLoad.has(basename)) {
+      console.log(`Skipping ${basename}, not loaded in config`);
+      continue;
+    }
+
+    try {
+      const mod = await import(filepath);
+
+      const generator: ServiceProviderGenerator = mod.default as ServiceProviderGenerator;
+      const serviceProvider = generator(shell);
+
+      console.log(`Loaded ${fp}`);
+      serviceProviders.push(serviceProvider);
+    } catch (e) {
+      console.log(`Error loading ${fp}:`);
+      console.log(e);
+      process.exit(1);
+    }
+  }
+
+  return serviceProviders;
 }
 
 export async function loadVariables(rootDir: string, baseVariables: Record<string, string> = {}): Promise<VariableStore> {

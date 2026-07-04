@@ -55,15 +55,20 @@ describe("Trackfile", () => {
       const t = new Trackfile();
       t.addUntracked("npm", "ripgrep");
       t.addUntracked("cargo", "eza");
+      t.setEnabledServices("systemd", ["sshd"]);
       t.serializeToFile(file);
 
       const raw = JSON.parse(fs.readFileSync(file).toString());
-      expect(raw).toEqual({ npm: ["ripgrep"], cargo: ["eza"] });
+      expect(raw).toEqual({
+        untracked: { npm: ["ripgrep"], cargo: ["eza"] },
+        enabledServices: { systemd: ["sshd"] },
+      });
 
       const loaded = new Trackfile();
       loaded.readFromFile(file);
       expect(loaded.getUntracked("npm")).toEqual(["ripgrep"]);
       expect(loaded.getUntracked("cargo")).toEqual(["eza"]);
+      expect(loaded.getEnabledServices("systemd")).toEqual(["sshd"]);
     } finally {
       fs.rmSync(file, { force: true });
     }
@@ -73,5 +78,58 @@ describe("Trackfile", () => {
     const t = new Trackfile();
     t.readFromFile(tmpPath()); // does not exist
     expect(t.getProviders()).toEqual([]);
+    expect(t.getServiceProviders()).toEqual([]);
+  });
+
+  test("migrates a legacy flat trackfile into the untracked section", () => {
+    const file = tmpPath();
+    try {
+      // the pre-services on-disk shape was just the untracked map
+      fs.writeFileSync(file, JSON.stringify({ npm: ["ripgrep"], cargo: ["eza"] }));
+
+      const t = new Trackfile();
+      t.readFromFile(file);
+      expect(t.getUntracked("npm")).toEqual(["ripgrep"]);
+      expect(t.getUntracked("cargo")).toEqual(["eza"]);
+      expect(t.getServiceProviders()).toEqual([]);
+    } finally {
+      fs.rmSync(file, { force: true });
+    }
+  });
+});
+
+describe("Trackfile enabledServices", () => {
+  test("setEnabledServices records, dedupes, and getEnabledServices/isServiceEnabled read back", () => {
+    const t = new Trackfile();
+    t.setEnabledServices("systemd", ["sshd", "docker", "sshd"]);
+
+    expect(t.getEnabledServices("systemd").sort()).toEqual(["docker", "sshd"]);
+    expect(t.isServiceEnabled("systemd", "sshd")).toBe(true);
+    expect(t.isServiceEnabled("systemd", "missing")).toBe(false);
+    expect(t.getServiceProviders()).toEqual(["systemd"]);
+  });
+
+  test("getEnabledServices returns an empty array for an unknown provider", () => {
+    const t = new Trackfile();
+    expect(t.getEnabledServices("nope")).toEqual([]);
+  });
+
+  test("setEnabledServices replaces the whole set and prunes when empty", () => {
+    const t = new Trackfile();
+    t.setEnabledServices("systemd", ["sshd", "docker"]);
+    t.setEnabledServices("systemd", ["docker"]); // replace, not merge
+    expect(t.getEnabledServices("systemd")).toEqual(["docker"]);
+
+    t.setEnabledServices("systemd", []); // empty prunes the key
+    expect(t.getServiceProviders()).toEqual([]);
+  });
+
+  test("enabledServices and untracked are independent for the same provider name", () => {
+    const t = new Trackfile();
+    t.addUntracked("systemd", "getty@tty1");
+    t.setEnabledServices("systemd", ["sshd"]);
+
+    expect(t.getUntracked("systemd")).toEqual(["getty@tty1"]);
+    expect(t.getEnabledServices("systemd")).toEqual(["sshd"]);
   });
 });
