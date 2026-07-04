@@ -33,6 +33,12 @@ cp ./starter/example-module.ts "$SYSDEF_DIRECTORY/modules/example.ts"
 cp ./starter/sysdef "$SYSDEF_DIRECTORY/bin"
 chmod +x "$SYSDEF_DIRECTORY/bin/sysdef"
 
+# Install the Claude Code "sysdef" skill so any agent on this machine knows how to
+# update this installation. Global (~/.claude/skills) so it's available everywhere.
+SKILL_DIR="$HOME/.claude/skills/sysdef"
+mkdir -p "$SKILL_DIR"
+cp ./starter/skill/SKILL.md "$SKILL_DIR/SKILL.md"
+
 cd "$SYSDEF_DIRECTORY" || exit
 
 echo "  - HOMEDIR: $HOME" >> config.yaml
